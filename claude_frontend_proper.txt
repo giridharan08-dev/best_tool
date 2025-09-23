@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunking Optimizer Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #2c2c2c 0%, #3d3d3d 25%, #4a4a4a 50%, #5a4a3d 75%, #6b4423 100%);
+            min-height: 100vh;
+            color: #ffffff;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .left-panel {
+            width: 350px;
+            background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff8c42, #ffa366, #cc6633);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: rgba(255,255,255,0.7);
+            font-size: 1.2rem;
+            font-style: italic;
+        }
+
+        .mode-selection {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .mode-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: #ff8c42;
+            text-align: center;
+        }
+
+        .mode-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .mode-card {
+            background: linear-gradient(135deg, rgba(255,140,66,0.1) 0%, rgba(204,102,51,0.1) 100%);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #ff8c42, #cc6633);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            border-radius: 15px;
+        }
+
+        .mode-card:hover::before {
+            opacity: 0.1;
+        }
+
+        .mode-card.selected {
+            border-color: #ff8c42;
+            box-shadow: 0 0 30px rgba(255,140,66,0.3);
+            transform: translateY(-5px);
+        }
+
+        .mode-card.selected::before {
+            opacity: 0.15;
+        }
+
+        .mode-card-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .mode-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .mode-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.8rem;
+            color: #ff8c42;
+        }
+
+        .mode-card p {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .processing-section {
+            display: none;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .processing-section.visible {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .file-upload {
+            border: 2px dashed rgba(255,140,66,0.5);
+            border-radius: 15px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .file-upload:hover {
+            border-color: #ff8c42;
+            background: rgba(255,140,66,0.05);
+        }
+
+        .file-upload.dragover {
+            border-color: #ff8c42;
+            background: rgba(255,140,66,0.1);
+            transform: scale(1.02);
+        }
+
+        .file-upload-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            color: #ff8c42;
+        }
+
+        .preprocessing-options {
+            display: none;
+            margin-top: 2rem;
+        }
+
+        .preprocessing-options.visible {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+
+        .config-step {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255,140,66,0.1);
+        }
+
+        .step-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .step-header h4 {
+            color: #ff8c42;
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-header p {
+            color: rgba(255,255,255,0.7);
+            font-size: 1rem;
+        }
+
+        .option-group h5 {
+            color: #ffa366;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .radio-item:hover {
+            background: rgba(255,140,66,0.1);
+            border-color: rgba(255,140,66,0.3);
+        }
+
+        .radio-item input {
+            margin-right: 1rem;
+            accent-color: #ff8c42;
+            transform: scale(1.2);
+        }
+
+        .radio-item span {
+            color: rgba(255,255,255,0.9);
+            font-weight: 500;
+        }
+
+        .config-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255,140,66,0.2);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #666, #555) !important;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #777, #666) !important;
+        }
+
+        .final-controls {
+            display: none;
+            text-align: center;
+            margin-top: 2rem;
+        }
+
+        .final-controls.visible {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .checkbox-item:hover {
+            background: rgba(255,140,66,0.1);
+            border-color: rgba(255,140,66,0.3);
+        }
+
+        .checkbox-item input {
+            margin-right: 1rem;
+            accent-color: #ff8c42;
+            transform: scale(1.2);
+        }
+
+        .query-section {
+            margin-top: auto;
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .query-section h3 {
+            color: #ff8c42;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.3rem;
+        }
+
+        .query-input {
+            width: 100%;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,140,66,0.3);
+            border-radius: 15px;
+            padding: 1.5rem;
+            color: white;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 140px;
+            transition: all 0.3s ease;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #ff8c42;
+            box-shadow: 0 0 20px rgba(255,140,66,0.2);
+            background: rgba(255,255,255,0.15);
+        }
+
+        .query-input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+
+        .search-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #ff8c42, #cc6633);
+            border: none;
+            border-radius: 15px;
+            padding: 1.2rem;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .search-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .search-btn:hover::before {
+            left: 100%;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255,140,66,0.3);
+        }
+
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .process-list {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .process-list h3 {
+            color: #ff8c42;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .process-item {
+            display: flex;
+            align-items: center;
+            padding: 1.2rem;
+            margin-bottom: 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .process-item.completed {
+            border-left-color: #4CAF50;
+        }
+
+        .process-item.processing {
+            border-left-color: #ff8c42;
+            background: rgba(255,140,66,0.1);
+        }
+
+        .process-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            margin-right: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: bold;
+        }
+
+        .process-icon.pending {
+            background: rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.6);
+        }
+
+        .process-icon.processing {
+            background: #ff8c42;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .process-icon.completed {
+            background: #4CAF50;
+            color: white;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .process-text {
+            flex: 1;
+            color: rgba(255,255,255,0.9);
+            font-weight: 500;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #ff8c42, #cc6633);
+            border: none;
+            border-radius: 10px;
+            padding: 1rem 2rem;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(255,140,66,0.3);
+        }
+
+        .uploaded-files {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .processing-summary {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            border: 1px solid rgba(75, 175, 80, 0.3);
+        }
+
+        .processing-summary h4 {
+            color: #4CAF50;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .summary-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+
+        .stat-label {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            color: #4CAF50;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .uploaded-files h4 {
+            color: #ff8c42;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .file-item {
+            background: rgba(255,255,255,0.05);
+            padding: 0.8rem;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-name {
+            color: rgba(255,255,255,0.9);
+            font-size: 0.9rem;
+        }
+
+        .file-size {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.8rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin: 1rem 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #ff8c42, #cc6633);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                width: 100%;
+                order: 2;
+            }
+            
+            .main-content {
+                order: 1;
+                padding: 1rem;
+            }
+            
+            .mode-options {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2.2rem;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Panel - Process Status -->
+        <div class="left-panel">
+            <div class="process-list">
+                <h3>🔧 Process Status</h3>
+                <div class="process-item" id="csvProcess">
+                    <div class="process-icon pending" id="csvIcon">📁</div>
+                    <div class="process-text">CSV Import & Validation</div>
+                </div>
+                <div class="process-item" id="chunkProcess">
+                    <div class="process-icon pending" id="chunkIcon">✂️</div>
+                    <div class="process-text">Text Chunking</div>
+                </div>
+                <div class="process-item" id="preprocessProcess">
+                    <div class="process-icon pending" id="preprocessIcon">⚙️</div>
+                    <div class="process-text">Preprocessing</div>
+                </div>
+                <div class="process-item" id="embeddingProcess">
+                    <div class="process-icon pending" id="embeddingIcon">🧠</div>
+                    <div class="process-text">Text Embeddings</div>
+                </div>
+                <div class="process-item" id="vectorProcess">
+                    <div class="process-icon pending" id="vectorIcon">🔍</div>
+                    <div class="process-text">Vector Storage</div>
+                </div>
+                <div class="process-item" id="optimizeProcess">
+                    <div class="process-icon pending" id="optimizeIcon">🎯</div>
+                    <div class="process-text">Chunk Optimization</div>
+                </div>
+                <div class="process-item" id="readyProcess">
+                    <div class="process-icon pending" id="readyIcon">✅</div>
+                    <div class="process-text">Ready for Queries</div>
+                </div>
+            </div>
+
+            <div id="uploadedFiles" class="uploaded-files hidden">
+                <h4>📂 Uploaded Files</h4>
+                <div id="fileList"></div>
+            </div>
+
+            <!-- Processing Summary -->
+            <div id="processingSummary" class="processing-summary hidden">
+                <h4>📊 Processing Summary</h4>
+                <div class="summary-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">⏱️ Processing Time:</span>
+                        <span class="stat-value" id="processingTime">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">📁 File Size:</span>
+                        <span class="stat-value" id="fileSize">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">💾 Memory Usage:</span>
+                        <span class="stat-value" id="memoryUsage">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">✂️ Chunks Created:</span>
+                        <span class="stat-value" id="chunksCreated">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <h1>🔧 Chunking Optimizer Tool</h1>
+                <p>Advanced document chunking and retrieval optimization system</p>
+            </div>
+
+            <!-- Mode Selection -->
+            <div class="mode-selection">
+                <div class="mode-title">Choose Your Optimization Mode</div>
+                <div class="mode-options">
+                    <div class="mode-card" data-mode="fast">
+                        <div class="mode-card-content">
+                            <span class="mode-icon">⚡</span>
+                            <h3>Fast Mode</h3>
+                            <p>Quick chunking with optimized default settings. Upload your CSV files and let our AI handle the rest automatically.</p>
+                        </div>
+                    </div>
+                    <div class="mode-card" data-mode="config">
+                        <div class="mode-card-content">
+                            <span class="mode-icon">⚙️</span>
+                            <h3>Config Mode</h3>
+                            <p>Customize preprocessing steps and chunking parameters. Perfect for specific document types and use cases.</p>
+                        </div>
+                    </div>
+                    <div class="mode-card" data-mode="deep">
+                        <div class="mode-card-content">
+                            <span class="mode-icon">🔬</span>
+                            <h3>Deep Config</h3>
+                            <p>Full control over all chunking algorithms, vector storage options, and optimization parameters.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload Section -->
+            <div class="processing-section" id="uploadSection">
+                <div class="file-upload" id="fileUpload">
+                    <div class="file-upload-icon">📤</div>
+                    <h3 style="color: #ff8c42; margin-bottom: 0.5rem;">Upload Your CSV Files</h3>
+                    <p style="color: rgba(255,255,255,0.7); margin-bottom: 1rem;">Drag and drop your files here or click to browse</p>
+                    <input type="file" id="fileInput" multiple accept=".csv" style="display: none;">
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">Choose Files</button>
+                </div>
+                <div class="progress-bar hidden" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- Preprocessing Options -->
+            <div class="preprocessing-options" id="preprocessingOptions">
+                <!-- All Configuration Steps in Single View -->
+                <div class="config-steps-container">
+                    <!-- Step 1: Preprocessing -->
+                    <div class="config-step" id="preprocessingStep">
+                        <div class="step-header">
+                            <h4>📝 Step 1: Preprocessing</h4>
+                            <p>Configure data preprocessing and cleaning options</p>
+                        </div>
+                        
+                        <div class="option-group">
+                            <h5>📊 Data Operations</h5>
+                            <div class="checkbox-group">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing" value="nograms">
+                                    NoGrams Processing
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing" value="duplicate">
+                                    Duplicate Removal
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing" value="column">
+                                    Column Processing
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing" value="datatype">
+                                    Data Type Conversion
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h5>🔧 Advanced Options</h5>
+                            <div class="checkbox-group">
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing_advanced" value="custom">
+                                    Custom Processing
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing_advanced" value="remove">
+                                    Remove Operations
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing_advanced" value="n400">
+                                    N400 Processing
+                                </label>
+                                <label class="checkbox-item">
+                                    <input type="checkbox" name="preprocessing_advanced" value="handling">
+                                    Error Handling
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Chunking Strategy -->
+                    <div class="config-step" id="chunkingStep">
+                        <div class="step-header">
+                            <h4>✂️ Step 2: Chunking Strategy</h4>
+                            <p>Configure how documents will be split into chunks</p>
+                        </div>
+                        
+                        <div class="option-group">
+                            <h5>🔄 Chunking Method</h5>
+                            <div class="select-group">
+                                <select name="chunking_method" class="config-select">
+                                    <option value="semantic">Semantic Chunking</option>
+                                    <option value="recursive">Recursive Character Splitting</option>
+                                    <option value="sliding_window">Sliding Window</option>
+                                    <option value="document_aware">Document-aware Chunking</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h5>📏 Chunk Size</h5>
+                            <div class="select-group">
+                                <select name="chunk_size" class="config-select">
+                                    <option value="small_128">Small (128)</option>
+                                    <option value="medium_256">Medium (256)</option>
+                                    <option value="large_512">Large (512)</option>
+                                    <option value="xlarge_1024">X-Large (1024)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h5>🔗 Overlap Percentage</h5>
+                            <div class="slider-group">
+                                <input type="range" id="overlapSlider" name="overlap" min="0" max="50" value="25" class="config-slider">
+                                <div class="slider-labels">
+                                    <span>0%</span>
+                                    <span id="overlapValue">25%</span>
+                                    <span>50%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Embedding Model -->
+                    <div class="config-step" id="embeddingStep">
+                        <div class="step-header">
+                            <h4>🧠 Step 3: Embedding Model</h4>
+                            <p>Select embedding model and configuration</p>
+                        </div>
+                        
+                        <div class="option-group">
+                            <h5>🤖 Model Selection</h5>
+                            <div class="select-group">
+                                <select name="embedding_model" class="config-select">
+                                    <option value="aoai_mpt_7b">AOAI-MPT-7Bm</option>
+                                    <option value="openai_ada_002">OpenAI Ada-002</option>
+                                    <option value="sentence_transformers">Sentence Transformers</option>
+                                    <option value="huggingface_bert">HuggingFace BERT</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h5>📐 Embedding Dimension</h5>
+                            <div class="select-group">
+                                <select name="embedding_dimension" class="config-select">
+                                    <option value="1536">1536 (Recommended)</option>
+                                    <option value="768">768</option>
+                                    <option value="384">384</option>
+                                    <option value="512">512</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Vector Storage -->
+                    <div class="config-step" id="vectorDbStep">
+                        <div class="step-header">
+                            <h4>🗄️ Step 4: Vector Storage</h4>
+                            <p>Configure vector database and indexing</p>
+                        </div>
+                        
+                        <div class="option-group">
+                            <h5>🏪 Storage Backend</h5>
+                            <div class="select-group">
+                                <select name="storage_backend" class="config-select">
+                                    <option value="faiss">FAISS</option>
+                                    <option value="chromadb">ChromaDB</option>
+                                    <option value="pinecone">Pinecone</option>
+                                    <option value="weaviate">Weaviate</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="option-group">
+                            <h5>🔍 Index Type</h5>
+                            <div class="select-group">
+                                <select name="index_type" class="config-select">
+                                    <option value="exact_search">Exact Search</option>
+                                    <option value="approximate_search">Approximate Search</option>
+                                    <option value="hnsw">HNSW Index</option>
+                                    <option value="ivf">IVF Index</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn" onclick="startProcessing()" style="width: 100%; margin-top: 2rem;">
+                    🚀 Start Processing
+                </button>
+                
+                <div class="control-buttons" style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <button class="btn" onclick="resetConfig()" style="flex: 1; background: linear-gradient(135deg, #666, #555);">
+                        🔄 Reset
+                    </button>
+                    <button class="btn" onclick="saveConfig()" style="flex: 1; background: linear-gradient(135deg, #4CAF50, #45a049);">
+                        💾 Save Config
+                    </button>
+                </div>
+
+                <!-- Final Controls for Config Steps -->
+                <div class="final-controls" id="finalControls">
+                    <button class="btn" onclick="startProcessing()" style="width: 100%; margin: 1rem 0;">
+                        🚀 Start Processing
+                    </button>
+                    
+                    <div class="control-buttons" style="display: flex; gap: 1rem;">
+                        <button class="btn" onclick="resetConfig()" style="flex: 1; background: linear-gradient(135deg, #666, #555);">
+                            🔄 Reset
+                        </button>
+                        <button class="btn" onclick="saveConfig()" style="flex: 1; background: linear-gradient(135deg, #4CAF50, #45a049);">
+                            💾 Save Config
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Query Section (Initially Hidden) -->
+            <div class="query-section hidden" id="querySection">
+                <h3>🔍 Query Your Optimized Chunks</h3>
+                <textarea 
+                    class="query-input" 
+                    id="queryInput" 
+                    placeholder="Enter your query here to search through your optimized document chunks..."
+                    disabled
+                ></textarea>
+                <button class="search-btn" id="searchBtn" onclick="executeQuery()" disabled>
+                    <span>🔎 Execute Query</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedMode = '';
+        let uploadedFilesList = [];
+        let currentConfigStep = 0;
+        let configSteps = ['preprocessingStep', 'chunkingStep', 'embeddingStep', 'vectorDbStep'];
+        let processSteps = ['csvProcess', 'chunkProcess', 'preprocessProcess', 'embeddingProcess', 'vectorProcess', 'optimizeProcess', 'readyProcess'];
+        let currentStep = 0;
+        let startTime;
+        let sessionId = null;
+        let statusPollingInterval = null;
+        const API_BASE_URL = 'http://localhost:8000';
+
+        // Mode selection
+        document.querySelectorAll('.mode-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedMode = this.dataset.mode;
+                
+                document.getElementById('uploadSection').classList.add('visible');
+                
+                if (selectedMode === 'fast') {
+                    // Fast mode: hide preprocessing options, show simple controls
+                    document.getElementById('preprocessingOptions').classList.remove('visible');
+                } else {
+                    // Config and Deep modes: show step-by-step configuration
+                    showConfigurationSteps();
+                }
+            });
+        });
+
+        // File upload handling
+        const fileUpload = document.getElementById('fileUpload');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+
+        fileUpload.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(file => file.name.endsWith('.csv'));
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            uploadedFilesList = files;
+            uploadFilesToBackend(files);
+        }
+
+        async function uploadFilesToBackend(files) {
+            try {
+                displayUploadedFiles(files);
+                document.getElementById('uploadedFiles').classList.remove('hidden');
+                
+                // Show progress bar
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+                progressBar.classList.remove('hidden');
+                
+                const formData = new FormData();
+                files.forEach(file => {
+                    formData.append('files', file);
+                });
+                
+                // Simulate upload progress
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress += Math.random() * 30;
+                    if (progress > 90) progress = 90;
+                    progressFill.style.width = progress + '%';
+                }, 200);
+                
+                const response = await fetch(`${API_BASE_URL}/upload-files`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                sessionId = result.session_id;
+                
+                setTimeout(() => {
+                    progressBar.classList.add('hidden');
+                    if (selectedMode === 'fast') {
+                        startFastMode();
+                    } else {
+                        showConfigurationSteps();
+                    }
+                }, 500);
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('File upload failed: ' + error.message);
+                document.getElementById('progressBar').classList.add('hidden');
+            }
+        }
+
+        function displayUploadedFiles(files) {
+            fileList.innerHTML = '';
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span class="file-name">📄 ${file.name}</span>
+                    <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function startFastMode() {
+            // Automatically start processing with default settings
+            startProcessing();
+        }
+
+        function showConfigurationSteps() {
+            document.getElementById('preprocessingOptions').classList.add('visible');
+        }
+
+        function startProcessing() {
+            // Hide final controls if visible
+            document.getElementById('finalControls').classList.remove('visible');
+            
+            // Reset config steps
+            currentConfigStep = 0;
+            document.getElementById('preprocessingOptions').classList.remove('visible');
+            document.getElementById('finalControls').classList.remove('visible');
+            startTime = Date.now();
+            updateProcessStep();
+        }
+
+        function updateProcessStep() {
+            if (currentStep < processSteps.length) {
+                const stepId = processSteps[currentStep];
+                const stepElement = document.getElementById(stepId);
+                const iconElement = stepElement.querySelector('.process-icon');
+                
+                // Set current step to processing
+                stepElement.classList.add('processing');
+                iconElement.classList.remove('pending');
+                iconElement.classList.add('processing');
+                
+                // Simulate processing time
+                setTimeout(() => {
+                    // Complete current step
+                    stepElement.classList.remove('processing');
+                    stepElement.classList.add('completed');
+                    iconElement.classList.remove('processing');
+                    iconElement.classList.add('completed');
+                    iconElement.textContent = '✓';
+                    
+                    currentStep++;
+                    
+                    if (currentStep < processSteps.length) {
+                        setTimeout(updateProcessStep, 500);
+                    } else {
+                        // All steps completed
+                        enableQueryInterface();
+                    }
+                }, Math.random() * 3000 + 1000);
+            }
+        }
+
+        function enableQueryInterface() {
+            // Show query section
+            const querySection = document.getElementById('querySection');
+            querySection.classList.remove('hidden');
+            querySection.innerHTML = `
+                <h3>🔍 Query Your Optimized Chunks</h3>
+                <textarea 
+                    class="query-input" 
+                    id="queryInput" 
+                    placeholder="🎉 Processing complete! Enter your query to search through your optimized document chunks..."
+                ></textarea>
+                <button class="search-btn" id="searchBtn" onclick="executeQuery()">
+                    <span>🔎 Execute Query</span>
+                </button>
+                <div id="queryResults" class="query-results hidden"></div>
+            `;
+            
+            // Add glow effect to query section
+            querySection.style.boxShadow = '0 0 20px rgba(75, 175, 80, 0.3)';
+        }
+
+        async function executeQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                alert('Please enter a query to search!');
+                return;
+            }
+
+            if (!sessionId) {
+                alert('No active session found. Please upload files and process them first.');
+                return;
+            }
+            
+            const searchBtn = document.getElementById('searchBtn');
+            const originalText = searchBtn.innerHTML;
+            searchBtn.innerHTML = '🔍 Searching...';
+            searchBtn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/query`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        session_id: sessionId
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Query failed: ${response.statusText}`);
+                }
+
+                const results = await response.json();
+                displayQueryResults(results);
+                
+            } catch (error) {
+                console.error('Query error:', error);
+                alert('Query failed: ' + error.message);
+            } finally {
+                searchBtn.innerHTML = originalText;
+                searchBtn.disabled = false;
+            }
+        }
+
+        function displayQueryResults(results) {
+            const resultsDiv = document.getElementById('queryResults');
+            
+            if (!results.results || results.results.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="no-results">
+                        <h4>No results found</h4>
+                        <p>Try adjusting your query or checking your processed documents.</p>
+                    </div>
+                `;
+            } else {
+                const resultsHtml = `
+                    <div class="results-header">
+                        <h4>Search Results</h4>
+                        <p>Found ${results.total_results} results in ${results.processing_time}s</p>
+                    </div>
+                    <div class="results-list">
+                        ${results.results.map((result, index) => `
+                            <div class="result-item">
+                                <div class="result-header">
+                                    <span class="result-score">Score: ${result.score}</span>
+                                    <span class="result-source">${result.metadata.source_file}</span>
+                                </div>
+                                <div class="result-content">
+                                    ${result.content}
+                                </div>
+                                <div class="result-metadata">
+                                    <small>Chunk ${result.metadata.chunk_index} • ${result.metadata.token_count} tokens</small>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                resultsDiv.innerHTML = resultsHtml;
+            }
+            
+            resultsDiv.classList.remove('hidden');
+        }
+
+        function executeQuery() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (!query) {
+                alert('Please enter a query to search!');
+                return;
+            }
+            
+            // Simulate query execution
+            const searchBtn = document.getElementById('searchBtn');
+            const originalText = searchBtn.innerHTML;
+            searchBtn.innerHTML = '🔍 Searching...';
+            searchBtn.disabled = true;
+            
+            setTimeout(() => {
+                searchBtn.innerHTML = originalText;
+                searchBtn.disabled = false;
+                
+                // Show mock results (you would replace this with actual results)
+                alert(`Query processed successfully!\n\nQuery: "${query}"\n\nFound relevant chunks in your optimized documents. In a real implementation, this would display the search results.`);
+            }, 2000);
+        }
+
+        function resetConfig() {
+            // Reset all checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            
+            // Reset process steps
+            document.querySelectorAll('.process-item').forEach(item => {
+                item.classList.remove('processing', 'completed');
+                const icon = item.querySelector('.process-icon');
+                icon.classList.remove('processing', 'completed');
+                icon.classList.add('pending');
+                
+                // Reset icon text
+                if (item.id === 'csvProcess') icon.textContent = '📁';
+                else if (item.id === 'chunkProcess') icon.textContent = '✂️';
+                else if (item.id === 'preprocessProcess') icon.textContent = '⚙️';
+                else if (item.id === 'embeddingProcess') icon.textContent = '🧠';
+                else if (item.id === 'vectorProcess') icon.textContent = '🔍';
+                else if (item.id === 'optimizeProcess') icon.textContent = '🎯';
+                else if (item.id === 'readyProcess') icon.textContent = '✅';
+            });
+            
+            // Hide summary and query sections
+            document.getElementById('processingSummary').classList.add('hidden');
+            document.getElementById('querySection').classList.add('hidden');
+            
+            currentStep = 0;
+        }
+
+        function saveConfig() {
+            const selectedOptions = {
+                mode: selectedMode,
+                preprocessing: Array.from(document.querySelectorAll('input[name="preprocessing"]:checked')).map(cb => cb.value),
+                preprocessing_advanced: Array.from(document.querySelectorAll('input[name="preprocessing_advanced"]:checked')).map(cb => cb.value),
+                chunking_method: document.querySelector('select[name="chunking_method"]')?.value,
+                chunk_size: document.querySelector('select[name="chunk_size"]')?.value,
+                overlap_percentage: document.querySelector('input[name="overlap"]')?.value,
+                embedding_model: document.querySelector('select[name="embedding_model"]')?.value,
+                embedding_dimension: document.querySelector('select[name="embedding_dimension"]')?.value,
+                storage_backend: document.querySelector('select[name="storage_backend"]')?.value,
+                index_type: document.querySelector('select[name="index_type"]')?.value
+            };
+            
+            // Save to localStorage (in a real app, you'd send this to your backend)
+            localStorage.setItem('chunkingOptimizerConfig', JSON.stringify(selectedOptions));
+            
+            // Show confirmation
+            alert('Configuration saved successfully!\n\n' + JSON.stringify(selectedOptions, null, 2));
+        }
+
+        // Slider functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlapSlider = document.getElementById('overlapSlider');
+            const overlapValue = document.getElementById('overlapValue');
+            
+            if (overlapSlider && overlapValue) {
+                overlapSlider.addEventListener('input', function() {
+                    overlapValue.textContent = this.value + '%';
+                });
+            }
+            
+            // Animate process items on load
+            setTimeout(() => {
+                document.querySelectorAll('.process-item').forEach((item, index) => {
+                    setTimeout(() => {
+                        item.classList.add('fade-in');
+                    }, index * 100);
+                });
+            }, 500);
+        });
+    </script>
+</body>
+</html>
