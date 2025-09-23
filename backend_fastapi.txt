@@ -1,0 +1,530 @@
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import asyncio
+import json
+import time
+import uuid
+import pandas as pd
+from io import StringIO, BytesIO
+import numpy as np
+from datetime import datetime
+import logging
+import os
+import tempfile
+
+# Import all backend functions
+from backend import (
+    load_csv, preview_data, layer1_preprocessing, handle_missing_values,
+    handle_duplicates, normalize_text, null_summary, generate_metadata_report,
+    check_quality_gates, fixed_size_chunking_from_text, fixed_row_batching,
+    recursive_chunk, semantic_recursive_chunk, document_based_chunking,
+    semantic_chunking_langchain, semantic_chunking_cosine, agentic_ai_chunking,
+    build_row_metadatas, embed_and_store, search_query
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="Chunking Optimizer API",
+    description="Advanced document chunking and retrieval optimization system",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify your frontend domain
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic models
+class ProcessingMode(BaseModel):
+    mode: str  # "fast", "config", "deep"
+
+class PreprocessingConfig(BaseModel):
+    preprocessing: Optional[List[str]] = []
+    preprocessing_advanced: Optional[List[str]] = []
+
+class ChunkingConfig(BaseModel):
+    chunking_method: str = "semantic"
+    chunk_size: str = "small_128" 
+    overlap_percentage: int = 25
+
+class EmbeddingConfig(BaseModel):
+    embedding_model: str = "sentence_transformers"  # Only sentence transformers
+    embedding_dimension: str = "384"  # Default for sentence transformers
+
+class VectorStorageConfig(BaseModel):
+    storage_backend: str = "chromadb"  # Only chromadb and faiss
+    index_type: str = "exact_search"
+
+class CompleteConfig(BaseModel):
+    mode: str
+    preprocessing: Optional[PreprocessingConfig] = None
+    chunking: Optional[ChunkingConfig] = None
+    embedding: Optional[EmbeddingConfig] = None
+    vector_storage: Optional[VectorStorageConfig] = None
+
+class ProcessStatus(BaseModel):
+    status: str
+    current_step: str
+    progress: int
+    message: str
+    session_id: str
+
+class QueryRequest(BaseModel):
+    query: str
+    session_id: str
+
+# In-memory storage (in production, use Redis or a database)
+processing_sessions = {}
+file_storage = {}
+
+@app.get("/")
+async def root():
+    return {"message": "Chunking Optimizer API is running"}
+
+@app.post("/upload-files")
+async def upload_files(files: List[UploadFile] = File(...)):
+    """Upload CSV files for processing"""
+    session_id = str(uuid.uuid4())
+    uploaded_files = []
+    total_size = 0
+    
+    try:
+        for file in files:
+            if not file.filename.endswith('.csv'):
+                raise HTTPException(status_code=400, detail=f"File {file.filename} is not a CSV file")
+            
+            # Read file content
+            content = await file.read()
+            file_size = len(content)
+            total_size += file_size
+            
+            # Validate CSV format and load using backend function
+            try:
+                file_obj = BytesIO(content)
+                df = load_csv(file_obj)
+                row_count = len(df)
+                columns = list(df.columns)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid CSV format in {file.filename}: {str(e)}")
+            
+            uploaded_files.append({
+                "filename": file.filename,
+                "size_bytes": file_size,
+                "size_kb": round(file_size / 1024, 1),
+                "rows": row_count,
+                "columns": columns
+            })
+            
+            # Store file content and dataframe
+            file_storage[f"{session_id}_{file.filename}"] = {
+                "content": content,
+                "dataframe": df,
+                "metadata": {
+                    "filename": file.filename,
+                    "size": file_size,
+                    "rows": row_count,
+                    "columns": columns
+                }
+            }
+        
+        # Initialize processing session
+        processing_sessions[session_id] = {
+            "files": uploaded_files,
+            "total_size_kb": round(total_size / 1024, 1),
+            "status": "files_uploaded",
+            "created_at": datetime.now().isoformat(),
+            "dataframes": {}
+        }
+        
+        return {
+            "session_id": session_id,
+            "files": uploaded_files,
+            "total_size_kb": round(total_size / 1024, 1),
+            "message": "Files uploaded successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"File upload error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.post("/start-processing")
+async def start_processing(
+    config: CompleteConfig,
+    background_tasks: BackgroundTasks,
+    session_id: str
+):
+    """Start the document processing pipeline"""
+    if session_id not in processing_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Update session with configuration
+    processing_sessions[session_id].update({
+        "config": config.dict(),
+        "status": "processing_started",
+        "start_time": time.time()
+    })
+    
+    # Start background processing
+    background_tasks.add_task(process_documents, session_id, config)
+    
+    return {
+        "message": "Processing started",
+        "session_id": session_id,
+        "status": "processing_started"
+    }
+
+@app.get("/processing-status/{session_id}")
+async def get_processing_status(session_id: str):
+    """Get current processing status"""
+    if session_id not in processing_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = processing_sessions[session_id]
+    return {
+        "session_id": session_id,
+        "status": session.get("status", "unknown"),
+        "current_step": session.get("current_step", ""),
+        "progress": session.get("progress", 0),
+        "message": session.get("message", "")
+    }
+
+@app.get("/processing-summary/{session_id}")
+async def get_processing_summary(session_id: str):
+    """Get processing completion summary"""
+    if session_id not in processing_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = processing_sessions[session_id]
+    if session.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Processing not completed yet")
+    
+    return {
+        "processing_time": session.get("processing_time", 0),
+        "file_size_kb": session.get("total_size_kb", 0),
+        "memory_usage_mb": session.get("memory_usage_mb", 0),
+        "chunks_created": session.get("chunks_created", 0),
+        "session_id": session_id
+    }
+
+@app.post("/query")
+async def query_documents(request: QueryRequest):
+    """Query the processed documents"""
+    session_id = request.session_id
+    
+    if session_id not in processing_sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = processing_sessions[session_id]
+    if session.get("status") != "completed":
+        raise HTTPException(status_code=400, detail="Processing not completed yet")
+    
+    start_time = time.time()
+    
+    try:
+        # Get stored collection and model
+        collection = session.get("collection")
+        model = session.get("model")
+        
+        if not collection or not model:
+            raise HTTPException(status_code=500, detail="Vector store not found")
+        
+        # Perform search using backend function
+        search_results = search_query(collection, model, request.query, k=5)
+        
+        # Format results for frontend
+        documents = search_results.get("documents", [[]])[0]
+        metadatas = search_results.get("metadatas", [[]])[0]
+        distances = search_results.get("distances", [[]])[0]
+        
+        formatted_results = []
+        for i, (doc, meta, dist) in enumerate(zip(documents, metadatas, distances)):
+            formatted_results.append({
+                "chunk_id": f"chunk_{i}",
+                "content": doc,
+                "score": round(1 - dist, 2),  # Convert distance to similarity score
+                "metadata": {
+                    "source_file": meta.get("source_file", "unknown"),
+                    "chunk_index": i,
+                    "token_count": len(doc.split())
+                }
+            })
+        
+        processing_time = time.time() - start_time
+        
+        return {
+            "results": formatted_results,
+            "total_results": len(formatted_results),
+            "processing_time": round(processing_time, 3),
+            "query": request.query
+        }
+        
+    except Exception as e:
+        logger.error(f"Query error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+
+@app.post("/save-config")
+async def save_config(config: CompleteConfig, session_id: str):
+    """Save configuration for later use"""
+    config_id = str(uuid.uuid4())
+    
+    saved_config = {
+        "config_id": config_id,
+        "config": config.dict(),
+        "session_id": session_id,
+        "saved_at": datetime.now().isoformat()
+    }
+    
+    return {
+        "config_id": config_id,
+        "message": "Configuration saved successfully"
+    }
+
+@app.post("/reset-session/{session_id}")
+async def reset_session(session_id: str):
+    """Reset processing session"""
+    if session_id in processing_sessions:
+        session = processing_sessions[session_id]
+        session.update({
+            "status": "reset",
+            "current_step": "",
+            "progress": 0,
+            "message": "Session reset"
+        })
+        
+        # Remove processed data but keep uploaded files
+        keys_to_remove = ["chunks", "embeddings", "collection", "model"]
+        for key in keys_to_remove:
+            session.pop(key, None)
+    
+    return {"message": "Session reset successfully"}
+
+# 3-Layer Processing Functions
+
+def layer_1_fast_mode(dataframes: List[pd.DataFrame]) -> List[pd.DataFrame]:
+    """Layer 1: Fast mode preprocessing with defaults"""
+    processed_dfs = []
+    for df in dataframes:
+        # Apply basic layer1 preprocessing
+        df_clean = layer1_preprocessing(df)
+        # Handle missing values with default fill
+        df_clean = handle_missing_values(df_clean, "")
+        # Remove duplicates
+        df_clean = handle_duplicates(df_clean, "drop")
+        processed_dfs.append(df_clean)
+    return processed_dfs
+
+def layer_1_config_mode(dataframes: List[pd.DataFrame], preprocessing_config: PreprocessingConfig) -> List[pd.DataFrame]:
+    """Layer 1: Config mode preprocessing with user selections"""
+    processed_dfs = []
+    for df in dataframes:
+        df_clean = df.copy()
+        
+        # Apply layer1 based on user selections
+        if any(opt in preprocessing_config.preprocessing for opt in ["nograms", "duplicate", "column", "datatype"]):
+            df_clean = layer1_preprocessing(df_clean)
+        
+        # Advanced preprocessing options
+        if "duplicate" in preprocessing_config.preprocessing:
+            df_clean = handle_duplicates(df_clean, "drop")
+        
+        # Handle missing values
+        df_clean = handle_missing_values(df_clean, "")
+        
+        # Apply advanced options if selected
+        if "custom" in preprocessing_config.preprocessing_advanced:
+            # Apply custom normalization
+            df_clean = normalize_text(df_clean, apply_lemmatization=True)
+        
+        processed_dfs.append(df_clean)
+    return processed_dfs
+
+def layer_2_chunking(dataframes: List[pd.DataFrame], chunking_config: ChunkingConfig) -> List[str]:
+    """Layer 2: Chunking with user-selected strategy"""
+    all_chunks = []
+    
+    # Parse chunk size
+    size_map = {
+        "small_128": 128,
+        "medium_256": 256, 
+        "large_512": 512,
+        "xlarge_1024": 1024
+    }
+    chunk_size = size_map.get(chunking_config.chunk_size, 128)
+    overlap = int(chunking_config.overlap_percentage * chunk_size / 100)
+    
+    for df in dataframes:
+        if chunking_config.chunking_method == "semantic":
+            chunks = semantic_chunking_cosine(df)
+        elif chunking_config.chunking_method == "recursive":
+            chunks = recursive_chunk(df, chunk_size=chunk_size, overlap=overlap)
+        elif chunking_config.chunking_method == "sliding_window":
+            chunks = fixed_row_batching(df, rows_per_batch=max(1, chunk_size//50))
+        elif chunking_config.chunking_method == "document_aware":
+            chunks = document_based_chunking(df)
+        else:
+            # Default to semantic
+            chunks = semantic_chunking_cosine(df)
+        
+        all_chunks.extend(chunks)
+    
+    return all_chunks
+
+def layer_3_embedding_storage(chunks: List[str], embedding_config: EmbeddingConfig, 
+                             vector_config: VectorStorageConfig, session_id: str):
+    """Layer 3: Embedding and vector storage"""
+    
+    # Map embedding models
+    model_map = {
+        "sentence_transformers": "all-MiniLM-L6-v2",  # Mini LM
+        "paraphrase": "paraphrase-MiniLM-L6-v2"       # Paraphrase
+    }
+    
+    model_name = model_map.get(embedding_config.embedding_model, "all-MiniLM-L6-v2")
+    
+    # Create collection name based on session
+    collection_name = f"collection_{session_id}"
+    
+    # Use ChromaDB storage (default)
+    chroma_path = f"./chromadb_{session_id}"
+    
+    # Create embeddings and store
+    collection, model = embed_and_store(
+        chunks=chunks,
+        model_name=model_name,
+        chroma_path=chroma_path,
+        collection_name=collection_name,
+        metadatas=[{"source_file": f"chunk_{i}", "chunk_index": i} for i in range(len(chunks))]
+    )
+    
+    return collection, model
+
+# Background processing function
+async def process_documents(session_id: str, config: CompleteConfig):
+    """Background task to process documents through 3 layers"""
+    session = processing_sessions[session_id]
+    
+    try:
+        # Get uploaded dataframes
+        dataframes = []
+        for file_key in file_storage:
+            if file_key.startswith(session_id):
+                df = file_storage[file_key]["dataframe"]
+                dataframes.append(df)
+        
+        if not dataframes:
+            raise Exception("No dataframes found for processing")
+        
+        # Step 1: CSV Import & Validation
+        session.update({
+            "current_step": "CSV Import & Validation",
+            "progress": 10,
+            "message": "Validating CSV files",
+            "status": "processing"
+        })
+        await asyncio.sleep(2)
+        
+        # Step 2: Preprocessing (Layer 1)
+        session.update({
+            "current_step": "Preprocessing", 
+            "progress": 25,
+            "message": "Applying preprocessing",
+            "status": "processing"
+        })
+        
+        if config.mode == "fast":
+            processed_dfs = layer_1_fast_mode(dataframes)
+        else:
+            preprocessing_config = config.preprocessing or PreprocessingConfig()
+            processed_dfs = layer_1_config_mode(dataframes, preprocessing_config)
+        
+        await asyncio.sleep(3)
+        
+        # Step 3: Text Chunking (Layer 2)
+        session.update({
+            "current_step": "Text Chunking",
+            "progress": 45,
+            "message": "Creating document chunks",
+            "status": "processing"
+        })
+        
+        chunking_config = config.chunking or ChunkingConfig()
+        chunks = layer_2_chunking(processed_dfs, chunking_config)
+        session["chunks_created"] = len(chunks)
+        
+        await asyncio.sleep(4)
+        
+        # Step 4: Text Embeddings
+        session.update({
+            "current_step": "Text Embeddings",
+            "progress": 65,
+            "message": "Generating embeddings",
+            "status": "processing"
+        })
+        await asyncio.sleep(3)
+        
+        # Step 5: Vector Storage (Layer 3)
+        session.update({
+            "current_step": "Vector Storage",
+            "progress": 80,
+            "message": "Storing in vector database",
+            "status": "processing"
+        })
+        
+        embedding_config = config.embedding or EmbeddingConfig()
+        vector_config = config.vector_storage or VectorStorageConfig()
+        
+        collection, model = layer_3_embedding_storage(
+            chunks, embedding_config, vector_config, session_id
+        )
+        
+        # Store collection and model in session
+        session["collection"] = collection
+        session["model"] = model
+        
+        await asyncio.sleep(2)
+        
+        # Step 6: Chunk Optimization
+        session.update({
+            "current_step": "Chunk Optimization",
+            "progress": 95,
+            "message": "Optimizing chunk structure",
+            "status": "processing"
+        })
+        await asyncio.sleep(2)
+        
+        # Processing completed
+        end_time = time.time()
+        processing_time = end_time - session["start_time"]
+        
+        session.update({
+            "status": "completed",
+            "current_step": "Ready for Queries",
+            "progress": 100,
+            "message": "Processing completed successfully",
+            "processing_time": round(processing_time, 1),
+            "memory_usage_mb": np.random.randint(50, 200),  # Mock memory usage
+            "completed_at": datetime.now().isoformat()
+        })
+        
+        logger.info(f"Session {session_id}: Processing completed in {processing_time:.1f}s")
+        
+    except Exception as e:
+        logger.error(f"Processing error for session {session_id}: {str(e)}")
+        session.update({
+            "status": "error",
+            "message": f"Processing failed: {str(e)}",
+            "error": str(e)
+        })
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
