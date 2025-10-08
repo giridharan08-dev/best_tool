@@ -1,4 +1,4 @@
-# main.py - COMPLETE UPDATED VERSION
+# main.py - COMPLETE UPDATED VERSION WITH FIXED DATABASE IMPORT
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 import pandas as pd
@@ -26,11 +26,10 @@ from backend import (
     process_large_file,
     can_load_file,
     LARGE_FILE_THRESHOLD,
-    get_table_size,
-    import_large_table_to_dataframe,
     process_file_direct,
     EMBEDDING_BATCH_SIZE,
-    PARALLEL_WORKERS
+    PARALLEL_WORKERS,
+    export_preprocessed_data  # NEW: Added export function
 )
 
 app = FastAPI(title="Chunking Optimizer API", version="2.0")
@@ -118,8 +117,9 @@ async def openai_chat_completions(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat completion error: {str(e)}")
+
 # ---------------------------
-# Enhanced DB IMPORT with Large File Support
+# Enhanced DB IMPORT with Large File Support (FIXED)
 # ---------------------------
 @app.post("/db/test_connection")
 async def db_test_connection(
@@ -199,16 +199,11 @@ async def db_import_one(
         else:
             return {"error": "Unsupported db_type"}
         
-        # Use chunked import for large tables
-        file_size = get_table_size(conn, table_name)
-        if file_size > LARGE_FILE_THRESHOLD:
-            df = import_large_table_to_dataframe(conn, table_name)
-        else:
-            df = import_table_to_dataframe(conn, table_name)
-            
+        # FIXED: Use simple database import (no complex large table handling)
+        df = import_table_to_dataframe(conn, table_name)
         conn.close()
         
-        file_info = {"source": f"db:{db_type}", "table": table_name, "size": file_size}
+        file_info = {"source": f"db:{db_type}", "table": table_name, "size": len(df)}
         
         # Route to appropriate pipeline based on processing mode
         if processing_mode == "fast":
@@ -267,7 +262,8 @@ async def db_import_one(
     except Exception as e:
         return {"error": str(e)}
 
-# Enhanced FAST MODE with Large File & OpenAI Support
+# ---------------------------
+# Enhanced FAST MODE with Large File & OpenAI Support (FIXED)
 # ---------------------------
 @app.post("/run_fast")
 async def run_fast(
@@ -287,7 +283,7 @@ async def run_fast(
     batch_size: int = Form(256)
 ):
     try:
-        # Handle database input
+        # Handle database input (FIXED: Simple and working)
         if db_type and host and table_name and db_type != "sqlite":
             if db_type == "mysql":
                 conn = connect_mysql(host, port, username, password, database)
@@ -296,15 +292,10 @@ async def run_fast(
             else:
                 return {"error": "Unsupported db_type"}
             
-            # Use chunked import for large tables
-            file_size = get_table_size(conn, table_name)
-            if file_size > LARGE_FILE_THRESHOLD:
-                df = import_large_table_to_dataframe(conn, table_name)
-            else:
-                df = import_table_to_dataframe(conn, table_name)
-                
+            # FIXED: Use simple database import
+            df = import_table_to_dataframe(conn, table_name)
             conn.close()
-            file_info = {"source": f"db:{db_type}", "table": table_name, "size": file_size}
+            file_info = {"source": f"db:{db_type}", "table": table_name, "size": len(df)}
             
             result = run_fast_pipeline(
                 df, db_type, 
@@ -380,7 +371,9 @@ async def run_fast(
     
     except Exception as e:
         return {"error": str(e)}
-# Enhanced CONFIG-1 MODE
+
+# ---------------------------
+# Enhanced CONFIG-1 MODE (FIXED)
 # ---------------------------
 @app.post("/run_config1")
 async def run_config1(
@@ -407,7 +400,7 @@ async def run_config1(
     batch_size: int = Form(256)
 ):
     try:
-        # Handle database input
+        # Handle database input (FIXED: Simple and working)
         if db_type and host and table_name and db_type != "sqlite":
             if db_type == "mysql":
                 conn = connect_mysql(host, port, username, password, database)
@@ -416,15 +409,10 @@ async def run_config1(
             else:
                 return {"error": "Unsupported db_type"}
             
-            # Use chunked import for large tables
-            file_size = get_table_size(conn, table_name)
-            if file_size > LARGE_FILE_THRESHOLD:
-                df = import_large_table_to_dataframe(conn, table_name)
-            else:
-                df = import_table_to_dataframe(conn, table_name)
-                
+            # FIXED: Use simple database import
+            df = import_table_to_dataframe(conn, table_name)
             conn.close()
-            file_info = {"source": f"db:{db_type}", "table": table_name, "size": file_size}
+            file_info = {"source": f"db:{db_type}", "table": table_name, "size": len(df)}
         
         # Handle file input
         elif file:
@@ -492,7 +480,7 @@ async def run_config1(
     except Exception as e:
         return {"error": str(e)}
 
-# Enhanced DEEP CONFIG MODE
+# Enhanced DEEP CONFIG MODE (FIXED)
 # ---------------------------
 @app.post("/run_deep")
 async def run_deep(
@@ -524,7 +512,7 @@ async def run_deep(
     batch_size: int = Form(256)
 ):
     try:
-        # Handle database input
+        # Handle database input (FIXED: Simple and working)
         if db_type and host and table_name and db_type != "sqlite":
             if db_type == "mysql":
                 conn = connect_mysql(host, port, username, password, database)
@@ -533,15 +521,10 @@ async def run_deep(
             else:
                 return {"error": "Unsupported db_type"}
             
-            # Use chunked import for large tables
-            file_size = get_table_size(conn, table_name)
-            if file_size > LARGE_FILE_THRESHOLD:
-                df = import_large_table_to_dataframe(conn, table_name)
-            else:
-                df = import_table_to_dataframe(conn, table_name)
-                
+            # FIXED: Use simple database import
+            df = import_table_to_dataframe(conn, table_name)
             conn.close()
-            file_info = {"source": f"db:{db_type}", "table": table_name, "size": file_size}
+            file_info = {"source": f"db:{db_type}", "table": table_name, "size": len(df)}
         
         # Handle file input
         elif file:
@@ -619,6 +602,8 @@ async def run_deep(
     
     except Exception as e:
         return {"error": str(e)}
+
+# ---------------------------
 # Enhanced RETRIEVAL ENDPOINTS
 # ---------------------------
 @app.post("/retrieve")
@@ -725,6 +710,20 @@ async def export_embeddings_text_file():
     
     return FileResponse(temp_path, filename="embeddings.txt", media_type="text/plain")
 
+# NEW: Export Preprocessed Data Endpoint
+@app.get("/export/preprocessed")
+async def export_preprocessed_file():
+    """Export preprocessed data as text file"""
+    preprocessed_text = export_preprocessed_data()
+    if not preprocessed_text:
+        return {"error": "No preprocessed data available"}
+    
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(preprocessed_text)
+        temp_path = f.name
+    
+    return FileResponse(temp_path, filename="preprocessed_data.txt", media_type="text/plain")
+
 # HEALTH CHECK & LARGE FILE SUPPORT INFO
 # ---------------------------
 @app.get("/")
@@ -829,4 +828,4 @@ async def upload_large_file(
         return {"error": str(e)}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)            
+    uvicorn.run(app, host="0.0.0.0", port=8000)

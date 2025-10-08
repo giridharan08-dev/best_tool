@@ -14,63 +14,42 @@ import shutil
 # FastAPI backend URL
 API_BASE_URL = "http://localhost:8000"
 
-# ---------- Enhanced Dark Grey Theme with Animations ----------
+# ---------- Enhanced Black Theme with Animations ----------
 def load_css():
-    """Load custom CSS styles with enhanced animations and dark grey theme"""
+    """Load custom CSS styles with enhanced animations and black theme"""
     st.markdown(f"""
         <style>
-            /* Root variables with dark grey color scheme */
+            /* Root variables with black color scheme */
             :root {{
                 --primary-gradient: linear-gradient(135deg, #f26f21 0%, #ffa800 100%);
                 --success-gradient: linear-gradient(135deg, #48bb78, #38a169);
                 --warning-gradient: linear-gradient(135deg, #ed8936, #dd6b20);
                 --error-gradient: linear-gradient(135deg, #f56565, #e53e3e);
-                --glass-bg: #2d374899;
+                --glass-bg: #1a1a1a99;
                 --glass-border: rgba(255, 255, 255, 0.15);
                 --text-primary: #ffffff;
                 --text-secondary: #e2e8f0;
                 --text-muted: #a0aec0;
                 --border-light: rgba(255, 255, 255, 0.1);
-                --bg-light: #4a5568;
-                --background-color: #1a202c;
-                --card-background: #2d3748;
-                --dark-grey-bg: #2d3748;
-                --darker-grey-bg: #1a202c;
+                --bg-light: #2d2d2d;
+                --background-color: #000000;
+                --card-background: #1a1a1a;
+                --dark-grey-bg: #1a1a1a;
+                --darker-grey-bg: #000000;
             }}
             
-            /* Main styling with dark grey theme */
+            /* Main styling with black theme */
             .main {{
                 background: var(--darker-grey-bg);
                 color: var(--text-primary);
             }}
             
             .stApp {{
-                background: linear-gradient(135deg, #1a202c 0%, #2d3748 50%, #4a5568 100%);
+                background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%);
                 min-height: 100vh;
             }}
             
             /* Enhanced Header animations */
-            @keyframes float {{
-                0% {{ transform: translateY(0px) rotate(0deg); }}
-                50% {{ transform: translateY(-15px) rotate(2deg); }}
-                100% {{ transform: translateY(0px) rotate(0deg); }}
-            }}
-            
-            @keyframes glow {{
-                0% {{ 
-                    box-shadow: 0 0 5px #f26f21, 0 0 10px rgba(242, 111, 33, 0.3);
-                    transform: scale(1);
-                }}
-                50% {{ 
-                    box-shadow: 0 0 20px #ffa800, 0 0 30px rgba(255, 168, 0, 0.5);
-                    transform: scale(1.02);
-                }}
-                100% {{ 
-                    box-shadow: 0 0 5px #f26f21, 0 0 10px rgba(242, 111, 33, 0.3);
-                    transform: scale(1);
-                }}
-            }}
-            
             @keyframes slideIn {{
                 0% {{ 
                     transform: translateX(-100%); 
@@ -106,15 +85,6 @@ def load_css():
             @keyframes shimmer {{
                 0% {{ background-position: -200px 0; }}
                 100% {{ background-position: 200px 0; }}
-            }}
-            
-            .float-animation {{
-                animation: float 4s ease-in-out infinite;
-                text-align: center;
-            }}
-            
-            .glow-animation {{
-                animation: glow 3s ease-in-out infinite;
             }}
             
             .slide-in {{
@@ -742,6 +712,12 @@ def download_embeddings_text():
     response = requests.get(f"{API_BASE_URL}/export/embeddings_text")
     return response.content
 
+# NEW: Download preprocessed data
+def download_preprocessed_data():
+    """Download preprocessed data in text format"""
+    response = requests.get(f"{API_BASE_URL}/export/preprocessed")
+    return response.content
+
 # Database helper functions
 def db_test_connection_api(payload: dict):
     return requests.post(f"{API_BASE_URL}/db/test_connection", data=payload).json()
@@ -798,7 +774,7 @@ def display_scrollable_chunk(result, chunk_index):
     with st.expander(f"📄 Rank #{result['rank']} (Similarity: {result['similarity']:.3f})", expanded=False):
         # Header with similarity score
         st.markdown(f"""
-        <div style="background: #2d3748; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 6px solid {similarity_color};">
+        <div style="background: #1a1a1a; padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 6px solid {similarity_color};">
             <strong>Rank:</strong> {result['rank']} | 
             <strong>Similarity:</strong> {result['similarity']:.3f} | 
             <strong>Distance:</strong> {result.get('distance', 'N/A')}
@@ -828,10 +804,12 @@ def display_scrollable_chunk(result, chunk_index):
 # ---------- Streamlit App ----------
 st.set_page_config(page_title="Chunking Optimizer", layout="wide", page_icon="📦")
 
-# Enhanced header with animations
+# Enhanced header without floating animation
 st.markdown("""
-<div class="float-animation" style="background: var(--primary-gradient); padding: 40px; border-radius: 20px; margin-bottom: 30px; box-shadow: 0 15px 35px rgba(242, 111, 33, 0.4);">
-    <h1 style="color: white; text-align: center; margin: 0; font-size: 3em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">🚀 Chunking Optimizer v2.0</h1>
+<div style="background: var(--primary-gradient); padding: 40px; border-radius: 20px; margin-bottom: 30px; box-shadow: 0 15px 35px rgba(242, 111, 33, 0.4);">
+    <h1 style="color: white; text-align: center; margin: 0; font-size: 3em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+        <span style="color: #f26f21;">i</span>Chunking <span style="color: #f26f21;">O</span>ptimizer v2.0
+    </h1>
     <p style="color: white; text-align: center; margin: 15px 0 0 0; font-size: 1.4em; font-weight: 500;">Advanced Text Processing + 3GB File Support + Performance Optimized</p>
 </div>
 """, unsafe_allow_html=True)
@@ -885,7 +863,7 @@ if "batch_size" not in st.session_state:
 # Sidebar with process tracking and system info
 with st.sidebar:
     st.markdown("""
-    <div class="glow-animation" style="background: var(--primary-gradient); padding: 25px; border-radius: 15px; margin-bottom: 20px;">
+    <div style="background: var(--primary-gradient); padding: 25px; border-radius: 15px; margin-bottom: 20px;">
         <h2 style="color: white; text-align: center; margin: 0; font-size: 1.5em;">⚡ Process Tracker</h2>
     </div>
     """, unsafe_allow_html=True)
@@ -1203,7 +1181,13 @@ if st.session_state.current_mode:
         <div class="feature-card">
             <div class="card-title">🚀 Fast Mode Pipeline</div>
             <div class="card-content">
-                • Optimized preprocessing for speed<br>
+                • <strong>Automatic Preprocessing:</strong><br>
+                &nbsp;&nbsp;✓ Clean column names (assign defaults if missing)<br>
+                &nbsp;&nbsp;✓ Remove null values automatically<br>
+                &nbsp;&nbsp;✓ Convert text to lowercase<br>
+                &nbsp;&nbsp;✓ Remove delimiters and special characters<br>
+                &nbsp;&nbsp;✓ Remove extra whitespace<br>
+                &nbsp;&nbsp;✓ Remove stopwords (the, and, or, etc.)<br>
                 • Semantic clustering chunking<br>
                 • paraphrase-MiniLM-L6-v2 embedding model<br>
                 • Batch embedding with size {st.session_state.batch_size}<br>
@@ -1376,61 +1360,77 @@ if st.session_state.current_mode:
                 use_db_config = None
                 st.info("👆 Test connection and list tables first")
         
-        # Config-1 parameters
-        st.markdown("#### ⚙️ Configuration Parameters")
+        # Config-1 mode options
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("##### 🧹 Preprocessing")
-            null_handling = st.selectbox("Null value handling", ["keep", "drop", "fill", "mean", "median", "mode"], key="config1_null")
-            fill_value = st.text_input("Fill value", "Unknown", key="config1_fill") if null_handling == "fill" else None
+            null_handling = st.selectbox("Null Value Handling", 
+                                       ["keep", "drop", "fill", "mean", "median", "mode"], 
+                                       help="How to handle null values in the dataset")
+            fill_value = st.text_input("Fill Value (for 'fill' option)", "Unknown", 
+                                     help="Value to fill nulls with when using 'fill' option")
             
-            st.markdown("##### 📦 Chunking")
-            chunk_method = st.selectbox("Chunking method", ["fixed", "recursive", "semantic"], key="config1_chunk")
+            chunk_method = st.selectbox("Chunking Method", 
+                                      ["recursive", "fixed", "semantic", "document"],
+                                      help="Method to split data into chunks")
             
-            if chunk_method in ["fixed", "recursive"]:
-                chunk_size = st.slider("Chunk size", 100, 2000, 800, key="config1_size")
-                overlap = st.slider("Overlap", 0, 500, 20, key="config1_overlap")
+            if chunk_method == "document":
+                st.info("Document chunking groups rows by a key column")
         
         with col2:
-            st.markdown("##### 🤖 Embedding")
-            model_choice = st.selectbox("Embedding model", 
-                                      ["all-MiniLM-L6-v2", "paraphrase-MiniLM-L6-v2", "text-embedding-ada-002"],
-                                      key="config1_model")
+            chunk_size = st.slider("Chunk Size", 100, 2000, 400, 
+                                 help="Target size for each chunk (characters)")
+            overlap = st.slider("Chunk Overlap", 0, 200, 50, 
+                              help="Overlap between consecutive chunks")
             
-            st.markdown("##### 💾 Storage")
-            storage_choice = st.selectbox("Vector storage", ["faiss", "chromadb"], key="config1_storage")
+            model_choice = st.selectbox("Embedding Model", 
+                                      ["paraphrase-MiniLM-L6-v2", "all-MiniLM-L6-v2", "text-embedding-ada-002"],
+                                      help="Model to generate embeddings")
+            
+            storage_choice = st.selectbox("Vector Storage", 
+                                        ["faiss", "chroma"],
+                                        help="Vector database for storing embeddings")
         
-        # Performance Configuration for Config1 Mode
-        st.markdown("#### ⚡ Performance Configuration")
-        col1, col2 = st.columns(2)
+        # Performance settings
+        with st.expander("⚡ Performance Settings", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.session_state.use_turbo = st.checkbox("Enable Turbo Mode", 
+                                                       value=st.session_state.use_turbo,
+                                                       help="Parallel processing for faster execution")
+            with col2:
+                st.session_state.batch_size = st.slider("Batch Size", 
+                                                      64, 512, st.session_state.batch_size, 32,
+                                                      help="Embedding batch size (larger = faster but more memory)")
         
-        with col1:
-            st.session_state.use_turbo = st.checkbox(
-                "Enable Turbo Mode", 
-                value=st.session_state.use_turbo,
-                help="Faster processing with parallel operations"
-            )
-        
-        with col2:
-            st.session_state.batch_size = st.slider(
-                "Embedding Batch Size",
-                min_value=64,
-                max_value=512,
-                value=st.session_state.batch_size,
-                step=64,
-                help="Larger batches = faster processing (requires more memory)"
-            )
-        
-        if st.session_state.use_turbo:
-            st.success("✅ Turbo Mode: 2-3x Faster Processing")
+        # Display Config-1 pipeline with enhanced card
+        st.markdown(f"""
+        <div class="feature-card">
+            <div class="card-title">⚙️ Config-1 Mode Pipeline</div>
+            <div class="card-content">
+                • <strong>Automatic Preprocessing:</strong><br>
+                &nbsp;&nbsp;✓ Clean column names (assign defaults if missing)<br>
+                &nbsp;&nbsp;✓ Handle null values ({null_handling})<br>
+                &nbsp;&nbsp;✓ Convert text to lowercase<br>
+                &nbsp;&nbsp;✓ Remove delimiters and special characters<br>
+                &nbsp;&nbsp;✓ Remove extra whitespace<br>
+                &nbsp;&nbsp;✓ Remove stopwords (the, and, or, etc.)<br>
+                • {chunk_method.title()} chunking (size: {chunk_size}, overlap: {overlap})<br>
+                • {model_choice} embedding model<br>
+                • Batch embedding with size {st.session_state.batch_size}<br>
+                • {storage_choice.upper()} vector storage<br>
+                • {'⚡ Parallel processing' if st.session_state.use_turbo else 'Sequential processing'}<br>
+                • 3GB+ file support with disk streaming<br>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         run_enabled = (
             (input_source == "📁 Upload CSV File" and st.session_state.get('temp_file_path') is not None) or
             (input_source == "🗄️ Database Import" and use_db_config is not None)
         )
         
-        if st.button("🚀 Run Config-1 Pipeline", type="primary", use_container_width=True, disabled=not run_enabled):
+        if st.button("⚙️ Run Config-1 Pipeline", type="primary", use_container_width=True, disabled=not run_enabled):
             with st.spinner("Running Config-1 pipeline..."):
                 try:
                     # Update process status
@@ -1438,10 +1438,10 @@ if st.session_state.current_mode:
                     
                     config = {
                         "null_handling": null_handling,
-                        "fill_value": fill_value if fill_value else "Unknown",
+                        "fill_value": fill_value,
                         "chunk_method": chunk_method,
-                        "chunk_size": chunk_size if 'chunk_size' in locals() else 800,
-                        "overlap": overlap if 'overlap' in locals() else 20,
+                        "chunk_size": chunk_size,
+                        "overlap": overlap,
                         "model_choice": model_choice,
                         "storage_choice": storage_choice,
                     }
@@ -1470,7 +1470,7 @@ if st.session_state.current_mode:
                             st.session_state.batch_size
                         )
                     
-                    # Mark all as completed
+                    # Update process status
                     for step in ["preprocessing", "chunking", "embedding", "storage"]:
                         st.session_state.process_status[step] = "completed"
                         st.session_state.process_timings[step] = "Completed"
@@ -1498,7 +1498,7 @@ if st.session_state.current_mode:
                         st.session_state.temp_file_path = None
 
     elif st.session_state.current_mode == "deep":
-        st.markdown("### 🔬 Deep Config Mode Configuration")
+        st.markdown("### 🔬 Deep Config Mode")
         
         # Input source selection
         input_source = st.radio("Select Input Source:", ["📁 Upload CSV File", "🗄️ Database Import"], key="deep_input_source")
@@ -1527,17 +1527,27 @@ if st.session_state.current_mode:
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # Read the CSV file for preview and column type analysis
+                st.success(f"✅ **{uploaded_file.name}** loaded! ({file_size_str})")
+                
+                # Load preview dataframe
                 try:
-                    df = pd.read_csv(temp_path)
+                    df = pd.read_csv(temp_path, nrows=10)  # Only load first 10 rows for preview
+                    st.session_state.preview_df = df
                     st.session_state.current_df = df
-                    # Initialize preview only once
-                    if "preview_df" not in st.session_state or st.session_state.preview_df is None:
-                        st.session_state.preview_df = df.head(5).copy()
-                    st.success(f"✅ **{uploaded_file.name}** loaded! ({len(df)} rows, {len(df.columns)} columns, {file_size_str})")
                     
+                    # Initialize column types
+                    if not st.session_state.column_types:
+                        for col in df.columns:
+                            dtype = str(df[col].dtype)
+                            if 'int' in dtype or 'float' in dtype:
+                                st.session_state.column_types[col] = 'numeric'
+                            elif 'object' in dtype or 'string' in dtype:
+                                st.session_state.column_types[col] = 'string'
+                            else:
+                                st.session_state.column_types[col] = 'string'
+                
                 except Exception as e:
-                    st.error(f"Error reading CSV file: {str(e)}")
+                    st.error(f"Error loading preview: {str(e)}")
                 
             use_db_config = None
             
@@ -1603,160 +1613,179 @@ if st.session_state.current_mode:
                     "database": database,
                     "table_name": table_name
                 }
-                
             else:
                 use_db_config = None
                 st.info("👆 Test connection and list tables first")
         
-        # Deep config parameters
-        st.markdown("#### 🔧 Configuration Parameters")
+        # Deep mode advanced options
+        st.markdown("#### 🔧 Advanced Configuration")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("##### 🧹 Preprocessing")
-            null_handling = st.selectbox("Null value handling", ["keep", "drop", "fill", "mean", "median", "mode"], key="deep_null")
-            fill_value = st.text_input("Fill value", "Unknown", key="deep_fill") if null_handling == "fill" else None
+            st.markdown("##### 🧹 Data Preprocessing")
             
-            # Enhanced Column Data Type Conversion (only for file uploads)
-            if input_source == "📁 Upload CSV File" and st.session_state.current_df is not None:
-                st.markdown("##### 🔄 Column Data Type Conversion")
-                st.info("Convert column types before processing:")
-                
-                df = st.session_state.current_df
-                preview_df = st.session_state.preview_df.copy() if st.session_state.preview_df is not None else df.head(5).copy()
-                column_types = st.session_state.column_types.copy()
-                
-                # Create a clean preview table with data types
-                st.markdown("**Preview (First 5 rows):**")
-                
-                # Display column headers with data type selection
-                for col in preview_df.columns:
-                    current_type = str(preview_df[col].dtype)
-                    default_idx = 0
-                    type_options = ["keep", "string", "numeric", "integer", "float", "datetime", "boolean", "category"]
-                    
-                    # Set default based on current conversion
-                    if col in column_types:
-                        default_idx = type_options.index(column_types[col])
-                    
-                    new_type = st.selectbox(
-                        f"**{col}** › Current: `{current_type}`",
-                        type_options,
-                        index=default_idx,
-                        key=f"col_type_{col}"
-                    )
-                    
-                    if new_type != "keep":
-                        column_types[col] = new_type
-                        # Apply conversion to preview
-                        try:
-                            if new_type == 'string':
-                                preview_df[col] = preview_df[col].astype(str)
-                            elif new_type == 'numeric':
-                                preview_df[col] = pd.to_numeric(preview_df[col], errors='coerce')
-                            elif new_type == 'integer':
-                                preview_df[col] = pd.to_numeric(preview_df[col], errors='coerce').fillna(0).astype(int)
-                            elif new_type == 'float':
-                                preview_df[col] = pd.to_numeric(preview_df[col], errors='coerce').astype(float)
-                            elif new_type == 'datetime':
-                                preview_df[col] = pd.to_datetime(preview_df[col], errors='coerce')
-                            elif new_type == 'boolean':
-                                if preview_df[col].dtype == 'object':
-                                    true_values = ['true', 'yes', '1', 't', 'y']
-                                    preview_df[col] = preview_df[col].astype(str).str.lower().isin(true_values)
-                            elif new_type == 'category':
-                                preview_df[col] = preview_df[col].astype('category')
-                        except Exception as e:
-                            st.error(f"Error converting {col}: {str(e)}")
-                    elif col in column_types:
-                        # Remove from conversions if set to "keep"
-                        del column_types[col]
-                
-                # Display the updated preview
-                st.dataframe(preview_df, use_container_width=True)
-                
-                st.session_state.column_types = column_types
-                st.session_state.preview_df = preview_df
-                
-                if column_types:
-                    st.success(f"🎯 {len(column_types)} columns will be converted")
-                else:
-                    st.info("No column type conversions selected")
+            # NULL HANDLING - Ask user explicitly
+            null_handling = st.selectbox("Null Value Handling", 
+                                       ["keep", "drop", "fill", "mean", "median", "mode"], 
+                                       help="How to handle null values in the dataset")
             
-            st.markdown("##### 🧠 Text Processing")
-            remove_stopwords = st.checkbox("Remove stopwords", key="deep_stop")
-            lowercase = st.checkbox("Convert to lowercase + clean text", value=True, key="deep_lower")
+            fill_value = st.text_input("Fill Value (for 'fill' option)", "Unknown", 
+                                     help="Value to fill nulls with when using 'fill' option")
             
-            # Radio button for stemming vs lemmatization (mutually exclusive)
-            text_processing_option = st.radio(
-                "Advanced text processing:",
-                ["none", "stemming", "lemmatization"],
-                index=0,
-                key="deep_text_processing"
-            )
+            # Text preprocessing options
+            lowercase = st.checkbox("Convert to Lowercase", value=True,
+                                  help="Convert all text to lowercase")
             
+            remove_stopwords = st.checkbox("Remove Stopwords", value=False,
+                                         help="Remove common stopwords (the, and, or, etc.)")
+            
+            # Text processing options
+            text_processing_option = st.selectbox("Advanced Text Processing",
+                                                ["none", "stemming", "lemmatization"],
+                                                help="Stemming reduces words to root form, lemmatization uses vocabulary")
+        
         with col2:
-            st.markdown("##### 📦 Chunking")
-            chunk_method = st.selectbox("Chunking method", ["fixed", "recursive", "semantic", "document"], key="deep_chunk")
+            st.markdown("##### 📦 Chunking Configuration")
             
-            if chunk_method in ["fixed", "recursive"]:
-                chunk_size = st.slider("Chunk size", 100, 2000, 800, key="deep_size")
-                overlap = st.slider("Overlap", 0, 500, 20, key="deep_overlap")
+            chunk_method = st.selectbox("Chunking Method", 
+                                      ["recursive", "fixed", "semantic", "document"],
+                                      help="Method to split data into chunks")
             
-            # Document chunking column selection - show for both file and database
             if chunk_method == "document":
-                if st.session_state.current_df is not None:
-                    available_columns = st.session_state.current_df.columns.tolist()
-                    document_key_column = st.selectbox(
-                        "Select column for grouping:",
-                        available_columns,
-                        key="deep_document_column"
-                    )
-                    st.info(f"Chunks will be grouped by: **{document_key_column}**")
+                if st.session_state.preview_df is not None:
+                    key_column = st.selectbox("Document Key Column", 
+                                            st.session_state.preview_df.columns,
+                                            help="Column to group rows by for document chunking")
                 else:
-                    document_key_column = st.text_input(
-                        "Enter column name for grouping:",
-                        key="deep_document_column_text"
-                    )
-                    if document_key_column:
-                        st.info(f"Chunks will be grouped by: **{document_key_column}**")
+                    key_column = st.text_input("Document Key Column", 
+                                             help="Column name to group rows by")
+            else:
+                key_column = None
+            
+            chunk_size = st.slider("Chunk Size", 100, 2000, 400, 
+                                 help="Target size for each chunk (characters)")
+            
+            overlap = st.slider("Chunk Overlap", 0, 200, 50, 
+                              help="Overlap between consecutive chunks")
             
             st.markdown("##### 🤖 Embedding & Storage")
-            model_choice = st.selectbox("Embedding model", 
-                                      ["all-MiniLM-L6-v2", "paraphrase-MiniLM-L6-v2", "text-embedding-ada-002"],
-                                      key="deep_model")
-            storage_choice = st.selectbox("Vector storage", ["faiss", "chromadb"], key="deep_storage")
+            
+            model_choice = st.selectbox("Embedding Model", 
+                                      ["paraphrase-MiniLM-L6-v2", "all-MiniLM-L6-v2", "text-embedding-ada-002"],
+                                      help="Model to generate embeddings")
+            
+            storage_choice = st.selectbox("Vector Storage", 
+                                        ["faiss", "chroma"],
+                                        help="Vector database for storing embeddings")
         
-        # Performance Configuration for Deep Mode
-        st.markdown("#### ⚡ Performance Configuration")
-        col1, col2 = st.columns(2)
+        # Column Type Conversion (for file uploads only)
+        if input_source == "📁 Upload CSV File" and st.session_state.preview_df is not None:
+            st.markdown("##### 🔄 Column Data Type Conversion")
+            st.info("Specify data types for each column to improve processing")
+            
+            df_preview = st.session_state.preview_df
+            col1, col2, col3, col4 = st.columns(4)
+            
+            for i, col in enumerate(df_preview.columns):
+                current_col = [col1, col2, col3, col4][i % 4]
+                with current_col:
+                    current_type = st.session_state.column_types.get(col, 'string')
+                    new_type = st.selectbox(
+                        f"`{col}`",
+                        ["string", "numeric", "integer", "float", "datetime", "boolean", "category"],
+                        index=["string", "numeric", "integer", "float", "datetime", "boolean", "category"].index(current_type),
+                        key=f"col_type_{col}"
+                    )
+                    st.session_state.column_types[col] = new_type
+            
+            # Show preview with updated types
+            if st.button("🔄 Update Column Types Preview", use_container_width=True):
+                st.session_state.preview_updated = True
+                st.rerun()
+            
+            if st.session_state.preview_updated:
+                st.success("✅ Column types updated!")
+                # Show type conversion summary
+                type_counts = {}
+                for col, col_type in st.session_state.column_types.items():
+                    type_counts[col_type] = type_counts.get(col_type, 0) + 1
+                
+                type_summary = ", ".join([f"{count} {typ}" for typ, count in type_counts.items()])
+                st.info(f"**Type Summary:** {type_summary}")
         
-        with col1:
-            st.session_state.use_turbo = st.checkbox(
-                "Enable Turbo Mode", 
-                value=st.session_state.use_turbo,
-                help="Faster processing with parallel operations"
-            )
+        # Performance settings
+        with st.expander("⚡ Performance Settings", expanded=False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.session_state.use_turbo = st.checkbox("Enable Turbo Mode", 
+                                                       value=st.session_state.use_turbo,
+                                                       help="Parallel processing for faster execution")
+            with col2:
+                st.session_state.batch_size = st.slider("Batch Size", 
+                                                      64, 512, st.session_state.batch_size, 32,
+                                                      help="Embedding batch size (larger = faster but more memory)")
         
-        with col2:
-            st.session_state.batch_size = st.slider(
-                "Embedding Batch Size",
-                min_value=64,
-                max_value=512,
-                value=st.session_state.batch_size,
-                step=64,
-                help="Larger batches = faster processing (requires more memory)"
-            )
+        # NEW: Download Preprocessed Data Button
+        st.markdown("#### 💾 Export Preprocessed Data")
+        if st.button("📥 Download Preprocessed Data as TXT", 
+                    use_container_width=True,
+                    help="Download the preprocessed data as a text file for inspection"):
+            try:
+                preprocessed_content = download_preprocessed_data()
+                if preprocessed_content:
+                    st.download_button(
+                        label="⬇️ Save Preprocessed Data",
+                        data=preprocessed_content,
+                        file_name="preprocessed_data.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No preprocessed data available. Run the pipeline first.")
+            except Exception as e:
+                st.error(f"Error downloading preprocessed data: {str(e)}")
         
-        if st.session_state.use_turbo:
-            st.success("✅ Turbo Mode: 2-3x Faster Processing")
+        # Display Deep Config pipeline with enhanced card
+        preprocessing_steps = [
+            "Clean column names (assign defaults if missing)",
+            f"Handle null values ({null_handling})",
+            f"Convert to lowercase: {'Yes' if lowercase else 'No'}",
+            "Remove delimiters and special characters",
+            "Remove extra whitespace", 
+            f"Remove stopwords: {'Yes' if remove_stopwords else 'No'}",
+            f"Text processing: {text_processing_option if text_processing_option != 'none' else 'None'}"
+        ]
+        
+        if st.session_state.column_types:
+            type_conversions = f"{len(st.session_state.column_types)} columns with type conversion"
+            preprocessing_steps.append(type_conversions)
+        
+        preprocessing_text = "\n".join([f"&nbsp;&nbsp;✓ {step}" for step in preprocessing_steps])
+        
+        st.markdown(f"""
+        <div class="feature-card">
+            <div class="card-title">🔬 Deep Config Mode Pipeline</div>
+            <div class="card-content">
+                • <strong>Advanced Preprocessing:</strong><br>
+                {preprocessing_text}
+                • {chunk_method.title()} chunking (size: {chunk_size}, overlap: {overlap})<br>
+                • {model_choice} embedding model<br>
+                • Batch embedding with size {st.session_state.batch_size}<br>
+                • {storage_choice.upper()} vector storage<br>
+                • {'⚡ Parallel processing' if st.session_state.use_turbo else 'Sequential processing'}<br>
+                • 3GB+ file support with disk streaming<br>
+                • 📥 Preprocessed data export available<br>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
         run_enabled = (
             (input_source == "📁 Upload CSV File" and st.session_state.get('temp_file_path') is not None) or
             (input_source == "🗄️ Database Import" and use_db_config is not None)
         )
         
-        if st.button("🚀 Run Deep Config Pipeline", type="primary", use_container_width=True, disabled=not run_enabled):
+        if st.button("🔬 Run Deep Pipeline", type="primary", use_container_width=True, disabled=not run_enabled):
             with st.spinner("Running Deep Config pipeline..."):
                 try:
                     # Update process status
@@ -1764,28 +1793,18 @@ if st.session_state.current_mode:
                     
                     config = {
                         "null_handling": null_handling,
-                        "fill_value": fill_value if fill_value else "Unknown",
+                        "fill_value": fill_value,
                         "remove_stopwords": remove_stopwords,
                         "lowercase": lowercase,
                         "text_processing_option": text_processing_option,
                         "chunk_method": chunk_method,
-                        "chunk_size": chunk_size if 'chunk_size' in locals() else 800,
-                        "overlap": overlap if 'overlap' in locals() else 20,
+                        "chunk_size": chunk_size,
+                        "overlap": overlap,
                         "model_choice": model_choice,
                         "storage_choice": storage_choice,
+                        "column_types": json.dumps(st.session_state.column_types) if st.session_state.column_types else "{}",
+                        "document_key_column": key_column if chunk_method == "document" else None
                     }
-                    
-                    # Add column types only for file uploads (not for database)
-                    if input_source == "📁 Upload CSV File":
-                        config["column_types"] = json.dumps(st.session_state.column_types)
-                    
-                    # Add document key column for document chunking
-                    if chunk_method == "document":
-                        if 'document_key_column' in locals() and document_key_column:
-                            config["document_key_column"] = document_key_column
-                        elif st.session_state.current_df is not None and len(st.session_state.current_df.columns) > 0:
-                            # Use first column as default
-                            config["document_key_column"] = st.session_state.current_df.columns[0]
                     
                     if input_source == "📁 Upload CSV File":
                         result = call_deep_api(
@@ -1811,20 +1830,12 @@ if st.session_state.current_mode:
                             st.session_state.batch_size
                         )
                     
-                    # Mark all as completed
+                    # Update process status
                     for step in ["preprocessing", "chunking", "embedding", "storage"]:
                         st.session_state.process_status[step] = "completed"
                         st.session_state.process_timings[step] = "Completed"
                     
                     st.session_state.api_results = result
-                    
-                    # Show conversion results if available
-                    if 'summary' in result and 'conversion_results' in result['summary']:
-                        conv_results = result['summary']['conversion_results']
-                        if conv_results:
-                            st.success(f"✅ Column type conversion: {len(conv_results.get('successful', []))} successful")
-                            if conv_results.get('failed'):
-                                st.warning(f"⚠️ {len(conv_results['failed'])} conversions failed")
                     
                     # Show performance results
                     if 'summary' in result:
@@ -1833,7 +1844,15 @@ if st.session_state.current_mode:
                         elif result['summary'].get('turbo_mode'):
                             st.success("⚡ Turbo mode completed successfully!")
                         else:
-                            st.success("✅ Deep Config pipeline completed successfully!")
+                            st.success("✅ Deep pipeline completed successfully!")
+                        
+                        # Show conversion results if available
+                        if 'conversion_results' in result['summary']:
+                            conv_results = result['summary']['conversion_results']
+                            if conv_results:
+                                successful = len(conv_results.get('successful', []))
+                                failed = len(conv_results.get('failed', []))
+                                st.info(f"**Type Conversions:** {successful} successful, {failed} failed")
                     
                     # Show retrieval section immediately
                     st.session_state.process_status["retrieval"] = "completed"
@@ -1846,80 +1865,190 @@ if st.session_state.current_mode:
                         os.unlink(st.session_state.temp_file_path)
                         st.session_state.temp_file_path = None
 
-# Vector Retrieval Section with Scrollable Chunks
-if st.session_state.api_results and st.session_state.api_results.get('summary', {}).get('retrieval_ready'):
+# Results and Retrieval Section
+if st.session_state.api_results and 'error' not in st.session_state.api_results:
     st.markdown("---")
-    st.markdown("## 🔍 Semantic Search (Vector DB)")
-    st.markdown("Search for similar content using semantic similarity")
+    st.markdown("## 📊 Processing Results")
     
-    col1, col2 = st.columns([3, 1])
+    result = st.session_state.api_results
+    mode = result.get('mode', 'Unknown')
+    
+    if 'summary' in result:
+        summary = result['summary']
+        
+        # Create metrics cards
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>📈 Rows Processed</h3>
+                <h2>{summary.get('rows', 'N/A')}</h2>
+                <p>Total data rows</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>📦 Chunks Created</h3>
+                <h2>{summary.get('chunks', 'N/A')}</h2>
+                <p>Embedding chunks</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>🤖 Embedding Model</h3>
+                <h2>{summary.get('embedding_model', 'N/A').split('/')[-1]}</h2>
+                <p>Vector generation</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            storage_type = summary.get('stored', 'N/A').upper()
+            st.markdown(f"""
+            <div class="metric-card">
+                <h3>💾 Vector Storage</h3>
+                <h2>{storage_type}</h2>
+                <p>Similarity search</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Additional features
+        if summary.get('turbo_mode'):
+            st.success("⚡ **Turbo Mode:** Parallel processing enabled for faster execution")
+        
+        if summary.get('large_file_processed'):
+            st.success("🚀 **Large File Processing:** File processed efficiently with disk streaming")
+        
+        if summary.get('retrieval_ready'):
+            st.success("🔍 **Retrieval System:** Ready for similarity search")
+    
+    # Export options
+    st.markdown("#### 💾 Export Results")
+    col1, col2, col3, col4 = st.columns(4)
+    
     with col1:
-        vector_query = st.text_input("Enter semantic search query:", placeholder="Search for similar content...", key="vector_query")
-    with col2:
-        k = st.slider("Top K results", 1, 10, 3, key="vector_k")
-    
-    if vector_query:
-        with st.spinner("Searching..."):
-            try:
-                st.session_state.process_status["retrieval"] = "running"
-                retrieval_result = call_retrieve_api(vector_query, k)
-                st.session_state.process_status["retrieval"] = "completed"
-                st.session_state.retrieval_results = retrieval_result
-                
-                if "error" in retrieval_result:
-                    st.error(f"Retrieval error: {retrieval_result['error']}")
-                else:
-                    st.success(f"✅ Found {len(retrieval_result['results'])} results")
-                    
-                    # Display each result with scrollable chunk content
-                    for i, result in enumerate(retrieval_result['results']):
-                        display_scrollable_chunk(result, i)
-                        
-            except Exception as e:
-                st.error(f"Retrieval error: {str(e)}")
-
-# Export Section
-if st.session_state.api_results:
-    st.markdown("---")
-    st.markdown("## 💾 Export Results")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 📥 Download Chunks")
-        if st.button("📄 Export Chunks as TXT", use_container_width=True):
+        if st.button("📄 Download Chunks", use_container_width=True):
             try:
                 chunks_content = download_file("/export/chunks", "chunks.txt")
                 st.download_button(
-                    label="⬇️ Download Chunks",
+                    label="⬇️ Save Chunks",
                     data=chunks_content,
                     file_name="chunks.txt",
                     mime="text/plain",
                     use_container_width=True
                 )
             except Exception as e:
-                st.error(f"Error exporting chunks: {str(e)}")
+                st.error(f"Error downloading chunks: {str(e)}")
     
     with col2:
-        st.markdown("#### 📥 Download Embeddings")
-        if st.button("🔢 Export Embeddings as TXT", use_container_width=True):
+        if st.button("🔢 Download Embeddings", use_container_width=True):
             try:
-                embeddings_content = download_embeddings_text()
+                embeddings_content = download_file("/export/embeddings", "embeddings.npy")
                 st.download_button(
-                    label="⬇️ Download Embeddings",
+                    label="⬇️ Save Embeddings",
                     data=embeddings_content,
+                    file_name="embeddings.npy",
+                    mime="application/octet-stream",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Error downloading embeddings: {str(e)}")
+    
+    with col3:
+        if st.button("📝 Embeddings Text", use_container_width=True):
+            try:
+                embeddings_text = download_embeddings_text()
+                st.download_button(
+                    label="⬇️ Save Embeddings Text",
+                    data=embeddings_text,
                     file_name="embeddings.txt",
                     mime="text/plain",
                     use_container_width=True
                 )
             except Exception as e:
-                st.error(f"Error exporting embeddings: {str(e)}")
+                st.error(f"Error downloading embeddings text: {str(e)}")
+    
+    with col4:
+        if st.button("🧹 Preprocessed Data", use_container_width=True):
+            try:
+                preprocessed_content = download_preprocessed_data()
+                if preprocessed_content:
+                    st.download_button(
+                        label="⬇️ Save Preprocessed Data",
+                        data=preprocessed_content,
+                        file_name="preprocessed_data.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No preprocessed data available")
+            except Exception as e:
+                st.error(f"Error downloading preprocessed data: {str(e)}")
+    
+    # Retrieval Section
+    st.markdown("---")
+    st.markdown("## 🔍 Semantic Retrieval")
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        query = st.text_area("Enter your query:", 
+                           placeholder="Search for similar content in your processed data...",
+                           height=100)
+    
+    with col2:
+        k = st.number_input("Number of results:", 1, 50, 5)
+        retrieval_model = st.selectbox("Retrieval Model", 
+                                     ["all-MiniLM-L6-v2", "paraphrase-MiniLM-L6-v2", "text-embedding-ada-002"])
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔍 Search Similar Content", use_container_width=True):
+            if query:
+                with st.spinner("Searching for similar content..."):
+                    try:
+                        if st.session_state.use_openai:
+                            result = call_openai_retrieve_api(query, retrieval_model, k)
+                        else:
+                            result = call_retrieve_api(query, k)
+                        
+                        st.session_state.retrieval_results = result
+                        st.session_state.process_status["retrieval"] = "completed"
+                        
+                    except Exception as e:
+                        st.error(f"Retrieval error: {str(e)}")
+            else:
+                st.warning("Please enter a query first")
+    
+    with col2:
+        if st.button("🧹 Clear Results", use_container_width=True):
+            st.session_state.retrieval_results = None
+    
+    # Display retrieval results
+    if st.session_state.retrieval_results:
+        results = st.session_state.retrieval_results
+        
+        if 'error' in results:
+            st.error(f"Retrieval error: {results['error']}")
+        elif 'results' in results and results['results']:
+            st.success(f"✅ Found {len(results['results'])} similar results for: \"{results.get('query', 'Unknown')}\"")
+            
+            # Display results with scrollable chunks
+            for i, result in enumerate(results['results']):
+                display_scrollable_chunk(result, i)
+        else:
+            st.info("No results found for the query")
 
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center; color: #a0aec0; font-size: 0.9em; padding: 20px;">
-    <p>📦 Chunking Optimizer v2.0 • FastAPI + Streamlit • 3GB+ File Support • Performance Optimized</p>
-    <p><strong>🚀 Enhanced with Turbo Mode & Parallel Processing • 📜 Scrollable Chunk Display</strong></p>
+<div style="text-align: center; color: var(--text-muted); padding: 20px;">
+    <p>🚀 <strong>Chunking Optimizer v2.0</strong> - Advanced Text Processing + 3GB File Support + Performance Optimized</p>
+    <p>Built with FastAPI, Streamlit, and advanced NLP technologies</p>
 </div>
 """, unsafe_allow_html=True)

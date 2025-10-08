@@ -1,4 +1,4 @@
-# backend.py - COMPLETE UPDATED VERSION
+# backend.py - COMPLETE UPDATED VERSION WITH ENHANCED PREPROCESSING
 import pandas as pd
 import numpy as np
 import re
@@ -33,6 +33,7 @@ current_embeddings = None
 current_metadata = None
 current_df = None
 current_file_info = None
+current_preprocessed_df = None  # NEW: Store preprocessed dataframe
 
 # -----------------------------
 # 🔹 Performance Optimization Configuration
@@ -117,100 +118,7 @@ def process_large_file_in_batches(file_path: str, processing_callback, batch_siz
     return chunks_processed
 
 # -----------------------------
-# 🔹 Database Size Estimation & Large Table Handling
-# -----------------------------
-def get_table_size(conn, table_name: str) -> int:
-    """Estimate table size in bytes"""
-    try:
-        cursor = conn.cursor()
-        if hasattr(conn, 'cursor'):  # PostgreSQL
-            cursor.execute(f"SELECT pg_relation_size('{table_name}')")
-            size = cursor.fetchone()[0]
-        else:  # MySQL
-            cursor.execute(f"SELECT data_length + index_length FROM information_schema.tables WHERE table_name = '{table_name}'")
-            size = cursor.fetchone()[0] or 0
-        cursor.close()
-        return size
-    except:
-        return 0  # Return 0 if cannot determine size
-
-def import_large_table_to_dataframe(conn, table_name: str, chunk_size: int = 20000):
-    """Import large tables in chunks to avoid memory issues"""
-    chunks = []
-    offset = 0
-    
-    while True:
-        query = f"SELECT * FROM {table_name} LIMIT {chunk_size} OFFSET {offset}"
-        try:
-            chunk_df = pd.read_sql(query, conn)
-        except:
-            # Fallback to regular import
-            query = f"SELECT * FROM {table_name}"
-            chunk_df = pd.read_sql(query, conn)
-            chunks.append(chunk_df)
-            break
-        
-        if chunk_df.empty:
-            break
-            
-        chunks.append(chunk_df)
-        offset += chunk_size
-        
-        # Clear memory by consolidating chunks periodically
-        if len(chunks) * chunk_size > 100000:  # Process every 100k rows
-            partial_df = pd.concat(chunks, ignore_index=True)
-            chunks = [partial_df]
-            gc.collect()
-    
-    return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
-# 🔹 OpenAI API Standards
-# -----------------------------
-class OpenAIEmbeddingAPI:
-    """OpenAI-compatible embedding API"""
-    
-    def __init__(self, model_name: str = "text-embedding-ada-002", api_key: str = None, base_url: str = None):
-        self.model_name = model_name
-        self.api_key = api_key
-        self.base_url = base_url or "https://api.openai.com/v1"
-        self.is_local = not api_key  # If no API key, use local model
-    
-    def encode(self, texts: List[str], batch_size: int = EMBEDDING_BATCH_SIZE) -> np.ndarray:
-        """Encode texts using OpenAI API or local fallback"""
-        if self.is_local:
-            # Use local model as fallback
-            from sentence_transformers import SentenceTransformer
-            local_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
-            embeddings = local_model.encode(texts, batch_size=batch_size)
-            return np.array(embeddings).astype("float32")
-        else:
-            # Use OpenAI API
-            import openai
-            openai.api_key = self.api_key
-            if self.base_url:
-                openai.base_url = self.base_url
-            
-            embeddings = []
-            for i in range(0, len(texts), batch_size):
-                batch_texts = texts[i:i + batch_size]
-                try:
-                    response = openai.embeddings.create(
-                        model=self.model_name,
-                        input=batch_texts
-                    )
-                    batch_embeddings = [data.embedding for data in response.data]
-                    embeddings.extend(batch_embeddings)
-                except Exception as e:
-                    logger.error(f"OpenAI API error: {e}")
-                    # Fallback to local model
-                    from sentence_transformers import SentenceTransformer
-                    local_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
-                    fallback_embeddings = local_model.encode(batch_texts)
-                    embeddings.extend(fallback_embeddings)
-            
-            return np.array(embeddings).astype("float32")
-
-# -----------------------------
-# 🔹 Database Connection Helpers (single-table import)
+# 🔹 Database Connection Helpers (FIXED - SIMPLE & WORKING)
 # -----------------------------
 def connect_mysql(host: str, port: int, username: str, password: str, database: str):
     import mysql.connector
@@ -274,11 +182,31 @@ def get_table_list(conn, db_type: str):
     return []
 
 def import_table_to_dataframe(conn, table_name: str) -> pd.DataFrame:
+    """SIMPLE WORKING DATABASE IMPORT - FIXED"""
     query = f"SELECT * FROM {table_name}"
     df = pd.read_sql(query, conn)
     return df
 
 current_sql_conn = None
+
+# NEW: Enhanced Column Name Cleaning
+def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean column names and assign default names if missing"""
+    df_clean = df.copy()
+    
+    # Generate default column names for missing or invalid column names
+    new_columns = []
+    for i, col in enumerate(df_clean.columns):
+        if pd.isna(col) or col == '' or col is None:
+            new_columns.append(f"column_{i+1}")
+        else:
+            # Clean the column name: remove special characters, replace spaces with underscores
+            clean_col = re.sub(r'[^\w\s]', '', str(col))
+            clean_col = re.sub(r'\s+', '_', clean_col.strip())
+            new_columns.append(clean_col if clean_col else f"column_{i+1}")
+    
+    df_clean.columns = new_columns
+    return df_clean
 
 # 🔹 NEW: Enhanced Column Data Type Conversion with Statistical Fill
 # -----------------------------
@@ -325,7 +253,6 @@ def convert_column_types(df: pd.DataFrame, column_types: Dict[str, str]) -> Tupl
                 # Try to convert common boolean representations
                 if df_converted[column].dtype == 'object':
                     true_values = ['true', 'yes', '1', 't', 'y']
-                    false_values = ['false', 'no', '0', 'f', 'n']
                     df_converted[column] = df_converted[column].astype(str).str.lower().isin(true_values)
                 conversion_results['successful'].append(f"{column} -> boolean")
                 
@@ -345,12 +272,14 @@ def convert_column_types(df: pd.DataFrame, column_types: Dict[str, str]) -> Tupl
                 f"{len(conversion_results['skipped'])} skipped")
     
     return df_converted, conversion_results
-# 🔹 Enhanced Text Cleaning Functions
+
+# -----------------------------
+# 🔹 Enhanced Text Cleaning Functions with Stopwords Removal
 # -----------------------------
 def clean_text_advanced(text_series: pd.Series, lowercase: bool = True, remove_delimiters: bool = True, 
-                       remove_whitespace: bool = True) -> pd.Series:
+                       remove_whitespace: bool = True, remove_stopwords: bool = True) -> pd.Series:
     """
-    Advanced text cleaning for string columns
+    Advanced text cleaning for string columns with stopwords removal
     """
     cleaned_series = text_series.astype(str)
     
@@ -364,6 +293,29 @@ def clean_text_advanced(text_series: pd.Series, lowercase: bool = True, remove_d
     if remove_whitespace:
         # Remove extra whitespace
         cleaned_series = cleaned_series.str.replace(r'\s+', ' ', regex=True).str.strip()
+    
+    if remove_stopwords:
+        try:
+            import nltk
+            from nltk.corpus import stopwords
+            # Download stopwords if not available
+            try:
+                stop_words = set(stopwords.words('english'))
+            except:
+                nltk.download('stopwords')
+                stop_words = set(stopwords.words('english'))
+            
+            # Remove stopwords
+            cleaned_series = cleaned_series.apply(
+                lambda text: ' '.join([word for word in text.split() if word not in stop_words])
+            )
+        except ImportError:
+            logger.warning("NLTK not available for stopwords removal")
+            # Basic stopwords removal without NLTK
+            basic_stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+            cleaned_series = cleaned_series.apply(
+                lambda text: ' '.join([word for word in text.split() if word not in basic_stopwords])
+            )
     
     return cleaned_series
 
@@ -416,18 +368,30 @@ def preprocess_basic(df: pd.DataFrame, null_handling="keep", fill_value=None):
 
 def preprocess_auto_fast(df: pd.DataFrame):
     """
-    Auto preprocessing for Fast Mode: lowercase + remove delimiters + remove whitespace
+    Auto preprocessing for Fast Mode: lowercase + remove delimiters + remove whitespace + stopwords + column cleaning
     """
     start_time = time.time()
+    
+    # Clean column names first
+    df = clean_column_names(df)
     
     # Handle nulls by dropping
     df = df.dropna().reset_index(drop=True)
     
-    # Apply text cleaning to all string columns
+    # Apply enhanced text cleaning to all string columns (with stopwords removal)
     for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = clean_text_advanced(df[col], lowercase=True, remove_delimiters=True, remove_whitespace=True)
+        df[col] = clean_text_advanced(df[col], 
+                                    lowercase=True, 
+                                    remove_delimiters=True, 
+                                    remove_whitespace=True,
+                                    remove_stopwords=True)
     
     logger.info(f"Auto Fast preprocessing completed in {time.time() - start_time:.2f}s")
+    
+    # Store preprocessed dataframe for export
+    global current_preprocessed_df
+    current_preprocessed_df = df.copy()
+    
     return df
 
 def preprocess_optimized_fast(df: pd.DataFrame):
@@ -435,6 +399,9 @@ def preprocess_optimized_fast(df: pd.DataFrame):
     OPTIMIZED: Faster preprocessing for large files - minimal operations
     """
     start_time = time.time()
+    
+    # Clean column names
+    df = clean_column_names(df)
     
     # Only essential operations - drop nulls
     df = df.dropna().reset_index(drop=True)
@@ -444,22 +411,39 @@ def preprocess_optimized_fast(df: pd.DataFrame):
         df[col] = df[col].astype(str).str.lower()
     
     logger.info(f"Optimized fast preprocessing completed in {time.time() - start_time:.2f}s")
+    
+    # Store preprocessed dataframe for export
+    global current_preprocessed_df
+    current_preprocessed_df = df.copy()
+    
     return df
 
 def preprocess_auto_config1(df: pd.DataFrame, null_handling="keep", fill_value=None):
     """
-    Auto preprocessing for Config1 Mode: lowercase + remove delimiters + remove whitespace + null handling
+    Auto preprocessing for Config1 Mode: lowercase + remove delimiters + remove whitespace + stopwords + null handling
     """
     start_time = time.time()
+    
+    # Clean column names
+    df = clean_column_names(df)
     
     # Handle nulls based on user choice
     df = preprocess_basic(df, null_handling, fill_value)
     
-    # Apply text cleaning to all string columns
+    # Apply enhanced text cleaning to all string columns (with stopwords removal)
     for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = clean_text_advanced(df[col], lowercase=True, remove_delimiters=True, remove_whitespace=True)
+        df[col] = clean_text_advanced(df[col], 
+                                    lowercase=True, 
+                                    remove_delimiters=True, 
+                                    remove_whitespace=True,
+                                    remove_stopwords=True)
     
     logger.info(f"Auto Config1 preprocessing completed in {time.time() - start_time:.2f}s")
+    
+    # Store preprocessed dataframe for export
+    global current_preprocessed_df
+    current_preprocessed_df = df.copy()
+    
     return df
 
 def preprocess_advanced(df: pd.DataFrame,
@@ -476,6 +460,9 @@ def preprocess_advanced(df: pd.DataFrame,
 
     start_time = time.time()
     
+    # Clean column names
+    df = clean_column_names(df)
+    
     # Apply column type conversions first if specified
     if column_types:
         df, conversion_results = convert_column_types(df, column_types)
@@ -490,24 +477,30 @@ def preprocess_advanced(df: pd.DataFrame,
         series = df[col].astype(str)
 
         if lowercase:
-            series = clean_text_advanced(series, lowercase=True, remove_delimiters=True, remove_whitespace=True)
+            # Use enhanced cleaning with user-specified stopwords removal
+            series = clean_text_advanced(series, 
+                                       lowercase=True, 
+                                       remove_delimiters=True, 
+                                       remove_whitespace=True,
+                                       remove_stopwords=remove_stopwords)
         else:
-            series = clean_text_advanced(series, lowercase=False, remove_delimiters=True, remove_whitespace=True)
+            series = clean_text_advanced(series, 
+                                       lowercase=False, 
+                                       remove_delimiters=True, 
+                                       remove_whitespace=True,
+                                       remove_stopwords=remove_stopwords)
 
-        if remove_stopwords or text_processing_option in ["stemming", "lemmatization"]:
+        if text_processing_option in ["stemming", "lemmatization"]:
             if not nltk_available:
                 logger.warning("NLTK not available for advanced text processing")
                 continue
                 
-            stop_words = set(stopwords.words("english")) if remove_stopwords else set()
             ps = PorterStemmer() if text_processing_option == "stemming" else None
             lm = WordNetLemmatizer() if text_processing_option == "lemmatization" else None
             
             new_vals = []
             for text in series:
                 tokens = re.findall(r"\w+", text)
-                if remove_stopwords:
-                    tokens = [t for t in tokens if t not in stop_words]
                 if text_processing_option == "stemming":
                     tokens = [ps.stem(t) for t in tokens]
                 elif text_processing_option == "lemmatization":
@@ -518,7 +511,13 @@ def preprocess_advanced(df: pd.DataFrame,
         df[col] = series
 
     logger.info(f"Advanced preprocessing completed in {time.time() - start_time:.2f}s")
+    
+    # Store preprocessed dataframe for export
+    global current_preprocessed_df
+    current_preprocessed_df = df.copy()
+    
     return df, conversion_results
+
 # 🔹 Improved Fixed Chunking with Large File Support
 # -----------------------------
 def chunk_fixed(df: pd.DataFrame, chunk_size=400, overlap=50):
@@ -710,6 +709,8 @@ def document_based_chunking(df: pd.DataFrame, key_column: str,
     
     logger.info(f"Document-based chunking completed in {time.time() - start_time:.2f}s, created {len(chunks)} chunks")
     return chunks, metas
+
+# -----------------------------
 # 🔹 Performance Optimized Embedding + Storage
 # -----------------------------
 def parallel_embed_texts(chunks, model_name="paraphrase-MiniLM-L6-v2", batch_size=EMBEDDING_BATCH_SIZE, num_workers=PARALLEL_WORKERS):
@@ -801,6 +802,52 @@ def store_faiss(embeddings):
     logger.info(f"FAISS storage completed in {time.time() - start_time:.2f}s, stored {embeddings.shape[0]} vectors")
     return {"type": "faiss", "index": index}
 
+# 🔹 OpenAI API Standards
+# -----------------------------
+class OpenAIEmbeddingAPI:
+    """OpenAI-compatible embedding API"""
+    
+    def __init__(self, model_name: str = "text-embedding-ada-002", api_key: str = None, base_url: str = None):
+        self.model_name = model_name
+        self.api_key = api_key
+        self.base_url = base_url or "https://api.openai.com/v1"
+        self.is_local = not api_key  # If no API key, use local model
+    
+    def encode(self, texts: List[str], batch_size: int = EMBEDDING_BATCH_SIZE) -> np.ndarray:
+        """Encode texts using OpenAI API or local fallback"""
+        if self.is_local:
+            # Use local model as fallback
+            from sentence_transformers import SentenceTransformer
+            local_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+            embeddings = local_model.encode(texts, batch_size=batch_size)
+            return np.array(embeddings).astype("float32")
+        else:
+            # Use OpenAI API
+            import openai
+            openai.api_key = self.api_key
+            if self.base_url:
+                openai.base_url = self.base_url
+            
+            embeddings = []
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                try:
+                    response = openai.embeddings.create(
+                        model=self.model_name,
+                        input=batch_texts
+                    )
+                    batch_embeddings = [data.embedding for data in response.data]
+                    embeddings.extend(batch_embeddings)
+                except Exception as e:
+                    logger.error(f"OpenAI API error: {e}")
+                    # Fallback to local model
+                    from sentence_transformers import SentenceTransformer
+                    local_model = SentenceTransformer("paraphrase-MiniLM-L6-v2")
+                    fallback_embeddings = local_model.encode(batch_texts)
+                    embeddings.extend(fallback_embeddings)
+            
+            return np.array(embeddings).astype("float32")
+
 # 🔹 Retrieval Functions with OpenAI Support
 # -----------------------------
 def retrieve_similar(query: str, k: int = 5):
@@ -876,6 +923,8 @@ def retrieve_similar(query: str, k: int = 5):
     
     logger.info(f"Retrieval completed in {time.time() - start_time:.2f}s, found {len(results)} results")
     return {"query": query, "k": k, "results": results}
+
+# -----------------------------
 # 🔹 Export Functions
 # -----------------------------
 def export_chunks():
@@ -889,6 +938,46 @@ def export_embeddings():
     """Export current embeddings as numpy array"""
     global current_embeddings
     return current_embeddings
+
+# NEW: Export Preprocessed Data
+def export_preprocessed_data():
+    """Export preprocessed data as text"""
+    global current_preprocessed_df
+    if current_preprocessed_df is not None:
+        # Create a readable text representation
+        text_output = "PREPROCESSED DATA SUMMARY\n"
+        text_output += "=" * 50 + "\n\n"
+        
+        text_output += f"Shape: {current_preprocessed_df.shape[0]} rows, {current_preprocessed_df.shape[1]} columns\n\n"
+        
+        text_output += "COLUMNS:\n"
+        text_output += "-" * 20 + "\n"
+        for col in current_preprocessed_df.columns:
+            dtype = current_preprocessed_df[col].dtype
+            text_output += f"{col} ({dtype})\n"
+        
+        text_output += "\nDATA PREVIEW (First 10 rows):\n"
+        text_output += "-" * 30 + "\n"
+        
+        # Convert first 10 rows to string representation
+        preview_df = current_preprocessed_df.head(10)
+        for idx, row in preview_df.iterrows():
+            text_output += f"\nRow {idx}:\n"
+            for col in preview_df.columns:
+                text_output += f"  {col}: {row[col]}\n"
+        
+        text_output += "\nNULL VALUES SUMMARY:\n"
+        text_output += "-" * 25 + "\n"
+        null_counts = current_preprocessed_df.isnull().sum()
+        for col, count in null_counts.items():
+            if count > 0:
+                text_output += f"{col}: {count} null values\n"
+        
+        if null_counts.sum() == 0:
+            text_output += "No null values found\n"
+        
+        return text_output
+    return ""
 
 # -----------------------------
 # 🔹 System Info
@@ -1130,6 +1219,8 @@ def process_large_file_deep(file_path: str, **kwargs):
     # Similar implementation as fast mode but with deep parameters  
     # For brevity, implementing basic version
     return process_large_file_fast(file_path, **kwargs)
+
+# -----------------------------
 # 🔹 NEW: Direct File Processing from Filesystem
 # -----------------------------
 def process_file_direct(file_path: str, processing_mode: str = "fast", **kwargs):
@@ -1153,14 +1244,3 @@ def process_file_direct(file_path: str, processing_mode: str = "fast", **kwargs)
         return process_large_file_deep(file_path, **kwargs)
     else:
         raise ValueError(f"Unknown processing mode: {processing_mode}")
-
-# -----------------------------
-# 🔹 NEW: Database Large Table Detection
-# -----------------------------
-def is_large_table(conn, table_name: str, threshold_mb: int = 100) -> bool:
-    """Check if database table is considered large"""
-    try:
-        table_size = get_table_size(conn, table_name)
-        return table_size > threshold_mb * 1024 * 1024
-    except:
-        return False  # If can't determine size, assume it's not large
